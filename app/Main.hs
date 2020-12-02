@@ -1,6 +1,6 @@
 module Main where
 
-import Lib
+import Finch
 
 main :: IO ()
-main = someFunc
+main = putStrLn "Hi"

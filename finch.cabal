@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 13142a7c794478fbd00dd7896653d8baa138ea96d051c151f1ca8b0de552817c
+-- hash: 7ef45f67e28cac1540de02982949faaabe9b698871e1b6d76181a772327c1d98
 
 name:           finch
 version:        0.1.0.0
@@ -27,13 +27,16 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      Finch
+      Commands
   other-modules:
       Paths_finch
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      base >=4.7 && <5,
+      vector,
+      split
   default-language: Haskell2010
 
 executable finch-exe
