@@ -1,21 +1,24 @@
 module Finch where
 
 import qualified Commands as Cmd
+import qualified Stack
 import qualified Data.Vector.Unboxed as Vec
 import Data.Vector.Unboxed ((!), Vector)
 import Data.List.Split (chunksOf)
 import Data.List (intercalate)
+import Control.Monad.State (execState, runState)
+import Control.Monad.Loops (iterateUntilM)
+import Data.Char (chr, ord, isDigit, digitToInt)
 
-type Command = Char
-type Stack = [Int]
 type PC = (Int, Int)
+
+-- Playfield
 data Playfield = Playfield
     { width :: Int
     , height :: Int
-    , source :: (Vector Command)
+    , source :: (Vector Char)
     } deriving (Eq)
 
--- Playfield
 instance Show Playfield where
     show (Playfield w h p) = intercalate "\n" $ chunksOf w $ Vec.toList p
 
@@ -25,28 +28,31 @@ playfieldWidth = 80
 emptyPlayfield = Playfield playfieldWidth playfieldHeight (Vec.replicate (playfieldWidth * playfieldHeight) ' ')
 
 validLocation :: PC -> Playfield -> Bool
-validLocation (x, y) (Playfield w h _) = x >= 0 && x < w && y <= 0 && y < h
+validLocation (x, y) (Playfield w h _) = x >= 0 && x < w && y >= 0 && y < h
 
 getCharAt :: PC -> Playfield -> Char
 getCharAt pc@(x, y) pf@(Playfield w  h source)
-    | validLocation pc pf = source ! (y * h + x)
+    | validLocation pc pf = source ! (y * w + x)
     | otherwise = ' '
 
 playfieldFromString :: String -> Int -> Int -> Playfield
 playfieldFromString source w h = Playfield w h $ Vec.fromList sourceData
-    where padToWidth line = take w $ (take w line) ++ (repeat ' ')
-          padToHeight lines = take h $ lines ++ (repeat $ take w (repeat ' '))
-          sourceData = concat $ padToHeight $ map padToWidth (lines source)
+  where
+    padToWidth line = take w $ (take w line) ++ (repeat ' ')
+    padToHeight lines = take h $ lines ++ (repeat $ take w (repeat ' '))
+    sourceData = concat $ padToHeight $ map padToWidth (lines source)
 
 -- Interpreter
-data Direction = DirL | DirR | DirU | DirD
+data Direction = DirL | DirR | DirU | DirD deriving (Show, Eq)
 
 data ProgramState = ProgramState
     { playfield :: Playfield
     , pc :: PC
-    , stack :: Stack
+    , stack :: Stack.Stack
     , currentDirection :: Direction
-    }
+    , finished :: Bool
+    , stringMode :: Bool
+    } deriving (Show, Eq)
 
 initialProgramState :: Playfield -> ProgramState
 initialProgramState pf = ProgramState
@@ -54,14 +60,107 @@ initialProgramState pf = ProgramState
     , pc = (0, 0)
     , stack = []
     , currentDirection = DirR
+    , finished = False
+    , stringMode  = False
     }
 
-pop :: Stack -> (Int, Stack)
-pop [] = (0, [])
-pop (x:xs) = (x, xs)
+getCurrentChar :: ProgramState -> Char
+getCurrentChar ps = getCharAt (pc ps) (playfield ps)
 
-push :: Stack -> Int -> Stack
-push xs x = (x:xs)
+advancePC :: ProgramState -> ProgramState
+advancePC ps = ps { pc = newPC }
+  where
+    (x, y) = pc ps
+    w = width $ playfield ps
+    h = height $ playfield ps
+    newPC = case currentDirection ps of
+                DirL -> (x - 1 `mod` w, y)
+                DirR -> (x + 1 `mod` w, y)
+                DirU -> (x, y - 1 `mod` h)
+                DirD -> (x, y + 1 `mod` h)
 
-getCurrentCommand :: ProgramState -> Command
-getCurrentCommand ps = getCharAt (pc ps) (playfield ps)
+directionalIf :: (Direction, Direction) -> ProgramState -> ProgramState
+directionalIf (d1, d2) ps = ps
+    { currentDirection = if topZero then d1 else d2
+    , stack = newStack
+    }
+  where
+    (topZero, newStack) = runState (fmap (== 0) Stack.pop) (stack ps)
+
+horizontalIf :: ProgramState -> ProgramState
+horizontalIf = directionalIf (DirR, DirL)
+
+verticalIf :: ProgramState -> ProgramState
+verticalIf = directionalIf (DirD, DirU)
+
+popPrintInteger :: ProgramState -> IO ProgramState
+popPrintInteger ps = do
+    let (top, newStack) = runState Stack.pop $ stack ps
+    putStr $ show top
+    return ps { stack = newStack }
+
+popPrintChar :: ProgramState -> IO ProgramState
+popPrintChar ps = do
+    let (top, newStack) = runState Stack.pop $ stack ps
+    putStr $ [chr top]
+    return ps { stack = newStack }
+
+pushReadInteger :: ProgramState -> IO ProgramState
+pushReadInteger ps = do
+    str <- getLine
+    let newStack = execState (Stack.push $ read str) (stack ps)
+    return ps { stack = newStack }
+
+pushReadChar :: ProgramState -> IO ProgramState
+pushReadChar ps = do
+    ch <- getChar
+    let newStack = execState (Stack.push $ ord ch) (stack ps)
+    return ps { stack = newStack }
+
+handleNonIOCmd :: ProgramState -> ProgramState
+handleNonIOCmd ps = case cmd of
+    Cmd.Noop -> ps
+    Cmd.Plus -> ps { stack = modifyStack Stack.add }
+    Cmd.Minus -> ps { stack = modifyStack Stack.subtract }
+    Cmd.Mult -> ps { stack = modifyStack Stack.multiply }
+    Cmd.Div -> ps { stack = modifyStack Stack.divide }
+    Cmd.Mod -> ps { stack = modifyStack Stack.modulo }
+    Cmd.Not -> ps { stack = modifyStack Stack.not }
+    Cmd.GreaterThan -> ps { stack = modifyStack Stack.greaterThan }
+    Cmd.MoveRight -> ps { currentDirection = DirR }
+    Cmd.MoveLeft -> ps { currentDirection = DirL }
+    Cmd.MoveUp -> ps { currentDirection = DirU }
+    Cmd.MoveDown -> ps { currentDirection = DirD }
+    Cmd.HorizontalIf -> horizontalIf ps
+    Cmd.VerticalIf -> verticalIf ps
+    Cmd.StringMode -> ps -- TODO
+    Cmd.Duplicate -> ps { stack = modifyStack Stack.duplicate }
+    Cmd.Swap -> ps { stack = modifyStack Stack.swap }
+    Cmd.PopDiscard -> ps { stack = modifyStack Stack.pop }
+    Cmd.Bridge -> advancePC ps
+    Cmd.Put -> ps -- TODO
+    Cmd.Get -> ps -- TODO
+    Cmd.Halt -> ps { finished = True }
+    _ -> if isDigit cmd
+            then ps { stack = modifyStack $ Stack.push $ digitToInt cmd }
+            else ps
+  where
+    cmd = getCurrentChar ps
+    modifyStack s = execState s $ stack ps
+
+processCurrentChar :: ProgramState -> IO ProgramState
+processCurrentChar ps = do
+    let cmd = getCurrentChar ps
+    case cmd of
+        Cmd.PopPrintInteger -> popPrintInteger ps
+        Cmd.PopPrintChar -> popPrintChar ps
+        Cmd.PromptInteger -> pushReadInteger ps
+        Cmd.PromptChar -> pushReadChar ps
+        --Cmd.MoveRandom -> ps -- TODO
+        _ -> return $ handleNonIOCmd ps
+
+step :: ProgramState -> IO ProgramState
+step = (fmap advancePC) . processCurrentChar
+
+run :: ProgramState -> IO ProgramState
+run = iterateUntilM finished step
