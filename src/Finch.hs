@@ -6,7 +6,7 @@ import qualified Data.Vector.Unboxed as Vec
 import Data.Vector.Unboxed ((!), Vector)
 import Data.List.Split (chunksOf)
 import Data.List (intercalate)
-import Control.Monad.State (execState, runState)
+import Control.Monad.State (State, execState, runState)
 import Control.Monad.Loops (iterateUntilM)
 import Data.Char (chr, ord, isDigit, digitToInt)
 
@@ -14,9 +14,9 @@ type PC = (Int, Int)
 
 -- Playfield
 data Playfield = Playfield
-    { width :: Int
-    , height :: Int
-    , source :: (Vector Char)
+    { width :: !Int
+    , height :: !Int
+    , source :: !(Vector Char)
     } deriving (Eq)
 
 instance Show Playfield where
@@ -25,7 +25,10 @@ instance Show Playfield where
 playfieldHeight = 25
 playfieldWidth = 80
 
-emptyPlayfield = Playfield playfieldWidth playfieldHeight (Vec.replicate (playfieldWidth * playfieldHeight) ' ')
+emptyPlayfield = Playfield
+    playfieldWidth
+    playfieldHeight
+    (Vec.replicate (playfieldWidth * playfieldHeight) ' ')
 
 validLocation :: PC -> Playfield -> Bool
 validLocation (x, y) (Playfield w h _) = x >= 0 && x < w && y >= 0 && y < h
@@ -46,12 +49,12 @@ playfieldFromString source w h = Playfield w h $ Vec.fromList sourceData
 data Direction = DirL | DirR | DirU | DirD deriving (Show, Eq)
 
 data ProgramState = ProgramState
-    { playfield :: Playfield
-    , pc :: PC
-    , stack :: Stack.Stack
-    , currentDirection :: Direction
-    , finished :: Bool
-    , stringMode :: Bool
+    { playfield :: !Playfield
+    , pc :: !PC
+    , stack :: !Stack.Stack
+    , currentDirection :: !Direction
+    , finished :: !Bool
+    , stringMode :: !Bool
     } deriving (Show, Eq)
 
 initialProgramState :: Playfield -> ProgramState
@@ -78,6 +81,9 @@ advancePC ps = ps { pc = newPC }
                 DirR -> (x + 1 `mod` w, y)
                 DirU -> (x, y - 1 `mod` h)
                 DirD -> (x, y + 1 `mod` h)
+
+modifyStack :: ProgramState -> (State Stack.Stack a) -> ProgramState
+modifyStack ps s = let newStack = execState s $ stack ps in ps { stack = newStack }
 
 directionalIf :: (Direction, Direction) -> ProgramState -> ProgramState
 directionalIf (d1, d2) ps = ps
@@ -108,25 +114,29 @@ popPrintChar ps = do
 pushReadInteger :: ProgramState -> IO ProgramState
 pushReadInteger ps = do
     str <- getLine
-    let newStack = execState (Stack.push $ read str) (stack ps)
-    return ps { stack = newStack }
+    return $ modifyStack ps (Stack.push $ read str)
 
 pushReadChar :: ProgramState -> IO ProgramState
 pushReadChar ps = do
     ch <- getChar
-    let newStack = execState (Stack.push $ ord ch) (stack ps)
-    return ps { stack = newStack }
+    return $ modifyStack ps (Stack.push $ ord ch)
+
+handleGet :: ProgramState -> ProgramState
+handleGet ps = modifyStack ps $ do
+    y <- Stack.pop
+    x <- Stack.pop
+    Stack.push $ ord $ getCharAt (x, y) (playfield ps)
 
 handleNonIOCmd :: ProgramState -> ProgramState
 handleNonIOCmd ps = case cmd of
     Cmd.Noop -> ps
-    Cmd.Plus -> ps { stack = modifyStack Stack.add }
-    Cmd.Minus -> ps { stack = modifyStack Stack.subtract }
-    Cmd.Mult -> ps { stack = modifyStack Stack.multiply }
-    Cmd.Div -> ps { stack = modifyStack Stack.divide }
-    Cmd.Mod -> ps { stack = modifyStack Stack.modulo }
-    Cmd.Not -> ps { stack = modifyStack Stack.not }
-    Cmd.GreaterThan -> ps { stack = modifyStack Stack.greaterThan }
+    Cmd.Plus -> modifyStack ps Stack.add
+    Cmd.Minus -> modifyStack ps Stack.subtract
+    Cmd.Mult -> modifyStack ps Stack.multiply
+    Cmd.Div -> modifyStack ps Stack.divide
+    Cmd.Mod -> modifyStack ps Stack.modulo
+    Cmd.Not -> modifyStack ps Stack.not
+    Cmd.GreaterThan -> modifyStack ps Stack.greaterThan
     Cmd.MoveRight -> ps { currentDirection = DirR }
     Cmd.MoveLeft -> ps { currentDirection = DirL }
     Cmd.MoveUp -> ps { currentDirection = DirU }
@@ -134,19 +144,18 @@ handleNonIOCmd ps = case cmd of
     Cmd.HorizontalIf -> horizontalIf ps
     Cmd.VerticalIf -> verticalIf ps
     Cmd.StringMode -> ps -- TODO
-    Cmd.Duplicate -> ps { stack = modifyStack Stack.duplicate }
-    Cmd.Swap -> ps { stack = modifyStack Stack.swap }
-    Cmd.PopDiscard -> ps { stack = modifyStack Stack.pop }
+    Cmd.Duplicate -> modifyStack ps Stack.duplicate
+    Cmd.Swap -> modifyStack ps Stack.swap
+    Cmd.PopDiscard -> modifyStack ps Stack.pop
     Cmd.Bridge -> advancePC ps
     Cmd.Put -> ps -- TODO
-    Cmd.Get -> ps -- TODO
+    Cmd.Get -> handleGet ps
     Cmd.Halt -> ps { finished = True }
     _ -> if isDigit cmd
-            then ps { stack = modifyStack $ Stack.push $ digitToInt cmd }
+            then modifyStack ps (Stack.push $ digitToInt cmd)
             else ps
   where
     cmd = getCurrentChar ps
-    modifyStack s = execState s $ stack ps
 
 processCurrentChar :: ProgramState -> IO ProgramState
 processCurrentChar ps = do

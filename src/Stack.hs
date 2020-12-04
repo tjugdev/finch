@@ -33,12 +33,14 @@ multiply = do
     v2 <- pop
     push (v2 * v1)
 
+-- TODO Division by zero?
 divide :: State Stack ()
 divide = do
     v1 <- pop
     v2 <- pop
     push (v2 `div` v1)
 
+-- TODO Division by zero?
 modulo :: State Stack ()
 modulo = do
     v1 <- pop
