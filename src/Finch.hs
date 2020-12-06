@@ -2,13 +2,15 @@ module Finch where
 
 import qualified Commands as Cmd
 import qualified Stack
-import qualified Data.Vector.Unboxed as Vec
-import Data.Vector.Unboxed ((!), Vector)
+import qualified Data.Vector.Unboxed as V
+import qualified Data.Vector.Unboxed.Mutable as MV
+import Data.Vector.Unboxed ((!))
 import Data.List.Split (chunksOf)
 import Data.List (intercalate)
 import Control.Monad.State (State, execState, runState)
 import Control.Monad.Loops (iterateUntilM)
 import Data.Char (chr, ord, isDigit, digitToInt)
+import System.Random (randomIO)
 
 type PC = (Int, Int)
 
@@ -16,11 +18,11 @@ type PC = (Int, Int)
 data Playfield = Playfield
     { width :: !Int
     , height :: !Int
-    , source :: !(Vector Char)
+    , source :: !(V.Vector Char)
     } deriving (Eq)
 
 instance Show Playfield where
-    show (Playfield w h p) = intercalate "\n" $ chunksOf w $ Vec.toList p
+    show (Playfield w h p) = intercalate "\n" $ chunksOf w $ V.toList p
 
 playfieldHeight = 25
 playfieldWidth = 80
@@ -28,7 +30,7 @@ playfieldWidth = 80
 emptyPlayfield = Playfield
     playfieldWidth
     playfieldHeight
-    (Vec.replicate (playfieldWidth * playfieldHeight) ' ')
+    (V.replicate (playfieldWidth * playfieldHeight) ' ')
 
 validLocation :: PC -> Playfield -> Bool
 validLocation (x, y) (Playfield w h _) = x >= 0 && x < w && y >= 0 && y < h
@@ -39,14 +41,14 @@ getCharAt pc@(x, y) pf@(Playfield w  h source)
     | otherwise = ' '
 
 playfieldFromString :: String -> Int -> Int -> Playfield
-playfieldFromString source w h = Playfield w h $ Vec.fromList sourceData
+playfieldFromString source w h = Playfield w h $ V.fromList sourceData
   where
     padToWidth line = take w $ (take w line) ++ (repeat ' ')
     padToHeight lines = take h $ lines ++ (repeat $ take w (repeat ' '))
     sourceData = concat $ padToHeight $ map padToWidth (lines source)
 
 -- Interpreter
-data Direction = DirL | DirR | DirU | DirD deriving (Show, Eq)
+data Direction = DirL | DirR | DirU | DirD deriving (Show, Eq, Enum)
 
 data ProgramState = ProgramState
     { playfield :: !Playfield
@@ -83,7 +85,9 @@ advancePC ps = ps { pc = newPC }
                 DirD -> (x, y + 1 `mod` h)
 
 modifyStack :: ProgramState -> (State Stack.Stack a) -> ProgramState
-modifyStack ps s = let newStack = execState s $ stack ps in ps { stack = newStack }
+modifyStack ps s = ps { stack = newStack }
+  where
+    newStack = execState s $ stack ps
 
 directionalIf :: (Direction, Direction) -> ProgramState -> ProgramState
 directionalIf (d1, d2) ps = ps
@@ -127,6 +131,32 @@ handleGet ps = modifyStack ps $ do
     x <- Stack.pop
     Stack.push $ ord $ getCharAt (x, y) (playfield ps)
 
+handlePut :: ProgramState -> ProgramState
+handlePut ps = ps { stack = newStack, playfield = newPlayfield }
+  where
+    stackAction = do
+        y <- Stack.pop
+        x <- Stack.pop
+        val <- Stack.pop
+        return ((x, y), val)
+    (((x, y), val), newStack) = runState stackAction $ stack ps
+    pf = playfield ps;
+    w = width pf
+    newSource
+        | validLocation (x, y) pf =
+            V.modify (\v -> MV.write v (y * w + x) (chr val)) $ source pf
+        | otherwise = source pf
+    newPlayfield = pf { source = newSource }
+
+moveRandom :: ProgramState -> IO ProgramState
+moveRandom ps = do
+    r <- randomIO :: IO Int
+    let direction = toEnum (r `mod` 4)
+    return $ ps { currentDirection = direction }
+
+toggleStringMode :: ProgramState -> ProgramState
+toggleStringMode ps = ps { stringMode = (not . stringMode) ps }
+
 handleNonIOCmd :: ProgramState -> ProgramState
 handleNonIOCmd ps = case cmd of
     Cmd.Noop -> ps
@@ -143,12 +173,12 @@ handleNonIOCmd ps = case cmd of
     Cmd.MoveDown -> ps { currentDirection = DirD }
     Cmd.HorizontalIf -> horizontalIf ps
     Cmd.VerticalIf -> verticalIf ps
-    Cmd.StringMode -> ps -- TODO
+    Cmd.StringMode -> toggleStringMode ps
     Cmd.Duplicate -> modifyStack ps Stack.duplicate
     Cmd.Swap -> modifyStack ps Stack.swap
     Cmd.PopDiscard -> modifyStack ps Stack.pop
     Cmd.Bridge -> advancePC ps
-    Cmd.Put -> ps -- TODO
+    Cmd.Put -> handlePut ps
     Cmd.Get -> handleGet ps
     Cmd.Halt -> ps { finished = True }
     _ -> if isDigit cmd
@@ -157,16 +187,33 @@ handleNonIOCmd ps = case cmd of
   where
     cmd = getCurrentChar ps
 
-processCurrentChar :: ProgramState -> IO ProgramState
-processCurrentChar ps = do
+processCurrentCmd :: ProgramState -> IO ProgramState
+processCurrentCmd ps = do
     let cmd = getCurrentChar ps
     case cmd of
         Cmd.PopPrintInteger -> popPrintInteger ps
         Cmd.PopPrintChar -> popPrintChar ps
         Cmd.PromptInteger -> pushReadInteger ps
         Cmd.PromptChar -> pushReadChar ps
-        --Cmd.MoveRandom -> ps -- TODO
+        Cmd.MoveRandom -> moveRandom ps
         _ -> return $ handleNonIOCmd ps
+
+handleStringMode :: ProgramState -> ProgramState
+handleStringMode ps = ps
+    { stringMode = newStringMode
+    , stack = newStack
+    }
+  where
+    ch = getCharAt (pc ps) (playfield ps)
+    newStringMode = ch /= Cmd.StringMode
+    newStack
+        | newStringMode = execState (Stack.push $ ord ch) (stack ps)
+        | otherwise = stack ps
+
+processCurrentChar :: ProgramState -> IO ProgramState
+processCurrentChar ps
+    | stringMode ps = return $ handleStringMode ps
+    | otherwise = processCurrentCmd ps
 
 step :: ProgramState -> IO ProgramState
 step = (fmap advancePC) . processCurrentChar

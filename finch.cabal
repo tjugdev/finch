@@ -39,7 +39,8 @@ library
       vector,
       mtl,
       split,
-      monad-loops
+      monad-loops,
+      random
   default-language: Haskell2010
 
 executable finch-exe
