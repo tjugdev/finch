@@ -157,46 +157,42 @@ moveRandom ps = do
 toggleStringMode :: ProgramState -> ProgramState
 toggleStringMode ps = ps { stringMode = (not . stringMode) ps }
 
-handleNonIOCmd :: ProgramState -> ProgramState
-handleNonIOCmd ps = case cmd of
-    Cmd.Noop -> ps
-    Cmd.Plus -> modifyStack ps Stack.add
-    Cmd.Minus -> modifyStack ps Stack.subtract
-    Cmd.Mult -> modifyStack ps Stack.multiply
-    Cmd.Div -> modifyStack ps Stack.divide
-    Cmd.Mod -> modifyStack ps Stack.modulo
-    Cmd.Not -> modifyStack ps Stack.not
-    Cmd.GreaterThan -> modifyStack ps Stack.greaterThan
-    Cmd.MoveRight -> ps { currentDirection = DirR }
-    Cmd.MoveLeft -> ps { currentDirection = DirL }
-    Cmd.MoveUp -> ps { currentDirection = DirU }
-    Cmd.MoveDown -> ps { currentDirection = DirD }
-    Cmd.HorizontalIf -> horizontalIf ps
-    Cmd.VerticalIf -> verticalIf ps
-    Cmd.StringMode -> toggleStringMode ps
-    Cmd.Duplicate -> modifyStack ps Stack.duplicate
-    Cmd.Swap -> modifyStack ps Stack.swap
-    Cmd.PopDiscard -> modifyStack ps Stack.pop
-    Cmd.Bridge -> advancePC ps
-    Cmd.Put -> handlePut ps
-    Cmd.Get -> handleGet ps
-    Cmd.Halt -> ps { finished = True }
-    _ -> if isDigit cmd
-            then modifyStack ps (Stack.push $ digitToInt cmd)
-            else ps
+processCurrentCmd :: ProgramState -> IO ProgramState
+processCurrentCmd ps = case cmd of
+    Cmd.PopPrintInteger -> popPrintInteger ps
+    Cmd.PopPrintChar -> popPrintChar ps
+    Cmd.PromptInteger -> pushReadInteger ps
+    Cmd.PromptChar -> pushReadChar ps
+    Cmd.MoveRandom -> moveRandom ps
+    _ -> return $
+        case cmd of
+            Cmd.Noop -> ps
+            Cmd.Plus -> modifyStack ps Stack.add
+            Cmd.Minus -> modifyStack ps Stack.subtract
+            Cmd.Mult -> modifyStack ps Stack.multiply
+            Cmd.Div -> modifyStack ps Stack.divide
+            Cmd.Mod -> modifyStack ps Stack.modulo
+            Cmd.Not -> modifyStack ps Stack.not
+            Cmd.GreaterThan -> modifyStack ps Stack.greaterThan
+            Cmd.MoveRight -> ps { currentDirection = DirR }
+            Cmd.MoveLeft -> ps { currentDirection = DirL }
+            Cmd.MoveUp -> ps { currentDirection = DirU }
+            Cmd.MoveDown -> ps { currentDirection = DirD }
+            Cmd.HorizontalIf -> horizontalIf ps
+            Cmd.VerticalIf -> verticalIf ps
+            Cmd.StringMode -> toggleStringMode ps
+            Cmd.Duplicate -> modifyStack ps Stack.duplicate
+            Cmd.Swap -> modifyStack ps Stack.swap
+            Cmd.PopDiscard -> modifyStack ps Stack.pop
+            Cmd.Bridge -> advancePC ps
+            Cmd.Put -> handlePut ps
+            Cmd.Get -> handleGet ps
+            Cmd.Halt -> ps { finished = True }
+            _ -> if isDigit cmd
+                    then modifyStack ps (Stack.push $ digitToInt cmd)
+                    else ps
   where
     cmd = getCurrentChar ps
-
-processCurrentCmd :: ProgramState -> IO ProgramState
-processCurrentCmd ps = do
-    let cmd = getCurrentChar ps
-    case cmd of
-        Cmd.PopPrintInteger -> popPrintInteger ps
-        Cmd.PopPrintChar -> popPrintChar ps
-        Cmd.PromptInteger -> pushReadInteger ps
-        Cmd.PromptChar -> pushReadChar ps
-        Cmd.MoveRandom -> moveRandom ps
-        _ -> return $ handleNonIOCmd ps
 
 handleStringMode :: ProgramState -> ProgramState
 handleStringMode ps = ps
