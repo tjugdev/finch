@@ -21,6 +21,11 @@ description:         Please see the README on GitHub at <https://github.com/tjug
 
 dependencies:
 - base >= 4.7 && < 5
+- vector
+- mtl
+- split
+- monad-loops
+- random
 
 library:
   source-dirs: src
