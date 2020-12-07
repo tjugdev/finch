@@ -1,6 +1,7 @@
 module Main where
 
 import Finch
+import qualified Playfield
 import Control.Exception (bracket)
 import System.Environment (getArgs)
 import System.Exit (exitSuccess, exitFailure)
@@ -12,9 +13,7 @@ runFile file = bracket
     hClose
     (\h -> do
         contents <- hGetContents h
-        let pf = playfieldFromString contents playfieldWidth playfieldHeight
-            programState = initialProgramState pf
-        run programState
+        runString Playfield.standardWidth Playfield.standardHeight contents
         return ()
     )
 

@@ -2,11 +2,7 @@ module Finch where
 
 import qualified Commands as Cmd
 import qualified Stack
-import qualified Data.Vector.Unboxed as V
-import qualified Data.Vector.Unboxed.Mutable as MV
-import Data.Vector.Unboxed ((!))
-import Data.List.Split (chunksOf)
-import Data.List (intercalate)
+import qualified Playfield
 import Control.Monad.State (State, execState, runState)
 import Control.Monad.Loops (iterateUntilM)
 import Data.Char (chr, ord, isDigit, digitToInt)
@@ -14,42 +10,11 @@ import System.Random (randomIO)
 
 type PC = (Int, Int)
 
--- Playfield
-data Playfield = Playfield
-    { width :: !Int
-    , height :: !Int
-    , source :: !(V.Vector Char)
-    } deriving (Eq)
-
-instance Show Playfield where
-    show (Playfield w h p) = intercalate "\n" $ chunksOf w $ V.toList p
-
-playfieldHeight = 25 :: Int
-playfieldWidth = 80 :: Int
-
-emptyPlayfield :: Int -> Int -> Playfield
-emptyPlayfield w h = Playfield w h (V.replicate (w * h) ' ')
-
-validLocation :: PC -> Playfield -> Bool
-validLocation (x, y) (Playfield w h _) = x >= 0 && x < w && y >= 0 && y < h
-
-getCharAt :: PC -> Playfield -> Char
-getCharAt pc@(x, y) pf@(Playfield w  h source)
-    | validLocation pc pf = source ! (y * w + x)
-    | otherwise = ' '
-
-playfieldFromString :: String -> Int -> Int -> Playfield
-playfieldFromString source w h = Playfield w h $ V.fromList sourceData
-  where
-    padToWidth line = take w $ (take w line) ++ (repeat ' ')
-    padToHeight lines = take h $ lines ++ (repeat $ take w (repeat ' '))
-    sourceData = concat $ padToHeight $ map padToWidth (lines source)
-
 -- Interpreter
 data Direction = DirL | DirR | DirU | DirD deriving (Show, Eq, Enum)
 
 data ProgramState = ProgramState
-    { playfield :: !Playfield
+    { playfield :: !Playfield.Playfield
     , pc :: !PC
     , stack :: !Stack.Stack
     , currentDirection :: !Direction
@@ -57,7 +22,7 @@ data ProgramState = ProgramState
     , stringMode :: !Bool
     } deriving (Show, Eq)
 
-initialProgramState :: Playfield -> ProgramState
+initialProgramState :: Playfield.Playfield -> ProgramState
 initialProgramState pf = ProgramState
     { playfield = pf
     , pc = (0, 0)
@@ -68,14 +33,14 @@ initialProgramState pf = ProgramState
     }
 
 getCurrentChar :: ProgramState -> Char
-getCurrentChar ps = getCharAt (pc ps) (playfield ps)
+getCurrentChar ps = Playfield.getChar (playfield ps) (pc ps)
 
 advancePC :: ProgramState -> ProgramState
 advancePC ps = ps { pc = newPC }
   where
     (x, y) = pc ps
-    w = width $ playfield ps
-    h = height $ playfield ps
+    w = Playfield.width $ playfield ps
+    h = Playfield.height $ playfield ps
     newPC = case currentDirection ps of
                 DirL -> (x - 1 `mod` w, y)
                 DirR -> (x + 1 `mod` w, y)
@@ -127,7 +92,7 @@ handleGet :: ProgramState -> ProgramState
 handleGet ps = modifyStack ps $ do
     y <- Stack.pop
     x <- Stack.pop
-    Stack.push $ ord $ getCharAt (x, y) (playfield ps)
+    Stack.push $ ord $ Playfield.getChar (playfield ps) (x, y)
 
 handlePut :: ProgramState -> ProgramState
 handlePut ps = ps { stack = newStack, playfield = newPlayfield }
@@ -139,12 +104,7 @@ handlePut ps = ps { stack = newStack, playfield = newPlayfield }
         return ((x, y), val)
     (((x, y), val), newStack) = runState stackAction $ stack ps
     pf = playfield ps;
-    w = width pf
-    newSource
-        | validLocation (x, y) pf =
-            V.modify (\v -> MV.write v (y * w + x) (chr val)) $ source pf
-        | otherwise = source pf
-    newPlayfield = pf { source = newSource }
+    newPlayfield = Playfield.putChar pf (x, y) (chr val)
 
 moveRandom :: ProgramState -> IO ProgramState
 moveRandom ps = do
@@ -198,7 +158,7 @@ handleStringMode ps = ps
     , stack = newStack
     }
   where
-    ch = getCharAt (pc ps) (playfield ps)
+    ch = Playfield.getChar (playfield ps) (pc ps)
     newStringMode = ch /= Cmd.StringMode
     newStack
         | newStringMode = execState (Stack.push $ ord ch) (stack ps)
@@ -214,3 +174,9 @@ step = (fmap advancePC) . processCurrentChar
 
 run :: ProgramState -> IO ProgramState
 run = iterateUntilM finished step
+
+runString :: Int -> Int -> String -> IO ProgramState
+runString width height input = do
+    let playfield = Playfield.fromString width height input
+        programState = initialProgramState playfield
+    run programState

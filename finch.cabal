@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: a2c211d2cfec99f4ea08f2e2341f913005f0bd9cda8d4378d9d52a60c7d2097d
+-- hash: 4f2df223229b8e56ea19051690d452f8710ed443157e98cc238ccd36408b5ec3
 
 name:           finch
 version:        0.1.0.0
@@ -29,6 +29,7 @@ library
   exposed-modules:
       Commands
       Finch
+      Playfield
       Stack
   other-modules:
       Paths_finch
