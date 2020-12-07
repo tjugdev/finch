@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 979e1dc1470f69721374f9f5ec017a33453a473a8996bfc5971e49b925048e2f
+-- hash: a2c211d2cfec99f4ea08f2e2341f913005f0bd9cda8d4378d9d52a60c7d2097d
 
 name:           finch
 version:        0.1.0.0
@@ -60,17 +60,39 @@ executable finch-exe
     , vector
   default-language: Haskell2010
 
-test-suite finch-test
+test-suite functional-tests
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      FunctionalSpec
       Paths_finch
   hs-source-dirs:
-      test
+      test/functional
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5
     , finch
+    , hspec
+    , monad-loops
+    , mtl
+    , random
+    , split
+    , vector
+  default-language: Haskell2010
+
+test-suite unit-tests
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      PlayfieldSpec
+      Paths_finch
+  hs-source-dirs:
+      test/unit
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , finch
+    , hspec
     , monad-loops
     , mtl
     , random

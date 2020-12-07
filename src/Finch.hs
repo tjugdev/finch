@@ -24,13 +24,11 @@ data Playfield = Playfield
 instance Show Playfield where
     show (Playfield w h p) = intercalate "\n" $ chunksOf w $ V.toList p
 
-playfieldHeight = 25
-playfieldWidth = 80
+playfieldHeight = 25 :: Int
+playfieldWidth = 80 :: Int
 
-emptyPlayfield = Playfield
-    playfieldWidth
-    playfieldHeight
-    (V.replicate (playfieldWidth * playfieldHeight) ' ')
+emptyPlayfield :: Int -> Int -> Playfield
+emptyPlayfield w h = Playfield w h (V.replicate (w * h) ' ')
 
 validLocation :: PC -> Playfield -> Bool
 validLocation (x, y) (Playfield w h _) = x >= 0 && x < w && y >= 0 && y < h
