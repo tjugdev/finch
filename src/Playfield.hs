@@ -17,11 +17,11 @@ import Data.List (intercalate)
 data Playfield = Playfield
     { width :: !Int
     , height :: !Int
-    , source :: !(V.Vector Char)
+    , raw :: !(V.Vector Char)
     } deriving (Eq)
 
 instance Show Playfield where
-    show (Playfield w h p) = intercalate "\n" $ chunksOf w $ V.toList p
+    show (Playfield w h raw) = intercalate "\n" $ chunksOf w $ V.toList raw
 
 standardWidth = 80 :: Int
 standardHeight = 25 :: Int
@@ -30,23 +30,23 @@ validLocation :: Playfield -> (Int, Int) -> Bool
 validLocation (Playfield w h _) (x, y) = x >= 0 && x < w && y >= 0 && y < h
 
 getChar :: Playfield -> (Int, Int) -> Char
-getChar pf@(Playfield w  h s) loc@(x, y)
-    | validLocation pf loc = s ! (y * w + x)
+getChar playfield@(Playfield w  h raw) loc@(x, y)
+    | validLocation playfield loc = raw ! (y * w + x)
     | otherwise = ' '
 
 putChar :: Playfield -> (Int, Int) -> Char -> Playfield
-putChar pf@(Playfield w h s) (x, y) ch = pf { source = newSource }
+putChar playfield@(Playfield w h raw) (x, y) ch = playfield { raw = newRaw }
   where
-    newSource
-        | validLocation pf (x, y) = V.modify (\v -> MV.write v (y * w + x) ch) s
-        | otherwise = s
+    newRaw
+        | validLocation playfield (x, y) = V.modify (\v -> MV.write v (y * w + x) ch) raw
+        | otherwise = raw
 
 fromString :: Int -> Int -> String -> Playfield
-fromString w h s = Playfield w h $ V.fromList sourceData
+fromString w h inputString = Playfield w h $ V.fromList raw
   where
     padToWidth line = take w $ (take w line) ++ (repeat ' ')
     padToHeight lines = take h $ lines ++ (repeat $ take w (repeat ' '))
-    sourceData = concat $ padToHeight $ map padToWidth (lines s)
+    raw = concat $ padToHeight $ map padToWidth (lines inputString)
 
 emptyPlayfield :: Int -> Int -> Playfield
 emptyPlayfield w h = Playfield w h (V.replicate (w * h) ' ')
