@@ -3,6 +3,7 @@ module Finch where
 import qualified Commands as Cmd
 import qualified Stack
 import qualified Playfield
+import qualified FinchIO
 import Control.Monad.State (State, execState, runState)
 import Control.Monad.Loops (iterateUntilM)
 import Data.Char (chr, ord, isDigit, digitToInt)
@@ -180,3 +181,9 @@ runString width height input = do
     let playfield = Playfield.fromString width height input
         programState = initialProgramState playfield
     run programState
+
+runStringStandardSize :: String -> IO ProgramState
+runStringStandardSize = runString Playfield.standardWidth Playfield.standardHeight
+
+runStringStandardSize_ :: String -> IO ()
+runStringStandardSize_ inputString = runStringStandardSize inputString >> return ()

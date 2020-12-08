@@ -38,6 +38,17 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    - -Werror
+    - -fwarn-tabs
+    - -fwarn-unused-imports
+    - -fwarn-missing-signatures
+    - -fwarn-name-shadowing
+    - -fwarn-incomplete-patterns
+    - -fwarn-incomplete-uni-patterns
+    - -fwarn-overlapping-patterns
+    - -fwarn-missing-signatures
+    - -fwarn-incomplete-record-updates
+
     dependencies:
     - finch
 

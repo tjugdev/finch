@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4f2df223229b8e56ea19051690d452f8710ed443157e98cc238ccd36408b5ec3
+-- hash: 3273f79df0b77a7de9332e084a85dd48bf501e4c7ac20cb2bc752c4e631d5a7f
 
 name:           finch
 version:        0.1.0.0
@@ -29,6 +29,7 @@ library
   exposed-modules:
       Commands
       Finch
+      FinchIO
       Playfield
       Stack
   other-modules:
@@ -50,7 +51,7 @@ executable finch-exe
       Paths_finch
   hs-source-dirs:
       app
-  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N -Werror -fwarn-tabs -fwarn-unused-imports -fwarn-missing-signatures -fwarn-name-shadowing -fwarn-incomplete-patterns -fwarn-incomplete-uni-patterns -fwarn-overlapping-patterns -fwarn-missing-signatures -fwarn-incomplete-record-updates
   build-depends:
       base >=4.7 && <5
     , finch
