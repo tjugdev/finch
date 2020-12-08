@@ -1,5 +1,5 @@
+{-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 module FinchIO
     ( FinchIO (getLine, getChar, print)
     , makeMockStdio
@@ -18,10 +18,11 @@ instance FinchIO IO where
     getChar = Prelude.getChar
     print = Prelude.putStr
 
-data MockStdio = MockStdio { stdinChars :: String
-                           , stdinStrings :: [String]
-                           , stdout :: String
-                           } deriving (Show, Eq)
+data MockStdio = MockStdio
+    { stdinChars   :: String
+    , stdinStrings :: [String]
+    , stdout       :: String
+    } deriving (Show, Eq)
 
 instance FinchIO (State MockStdio) where
   getLine = state getLine'
@@ -40,7 +41,7 @@ instance FinchIO (State MockStdio) where
 
 makeMockStdio :: String -> [String] -> MockStdio
 makeMockStdio inChars inStrings = MockStdio
-    { stdinChars = inChars
+    { stdinChars   = inChars
     , stdinStrings = inStrings
-    , stdout = ""
+    , stdout       = ""
     }

@@ -1,8 +1,8 @@
 module PlayfieldSpec (spec) where
 
-import Test.Hspec
-import Playfield
 import qualified Data.Vector.Unboxed as V
+import Playfield
+import Test.Hspec
 
 testInputString = unlines ["12 v"
                           ,"@.+<"
@@ -32,22 +32,22 @@ spec = do
     describe "getChar" $ do
         it "should getacorrect character when location is valid" $ do
             let playfield = fromString 6 3 testInputString
-                ch = Playfield.getChar playfield (2, 1)
+                ch        = Playfield.getChar playfield (2, 1)
             ch `shouldBe` '+'
 
         it "should get correct character when location is invalid" $ do
             let playfield = fromString 6 3 testInputString
-                ch = Playfield.getChar playfield (-1, -1)
+                ch        = Playfield.getChar playfield (-1, -1)
             ch `shouldBe` ' '
 
     describe "putChar" $ do
         it "should put character when location is valid" $ do
-            let playfield = fromString 6 3 testInputString
+            let playfield    = fromString 6 3 testInputString
                 newPlayfield = Playfield.putChar playfield (2, 1) '-'
             (V.toList $ playfieldRaw newPlayfield) `shouldBe` "12 v  @.-<        "
 
         it "should do nothing when location is invalid" $ do
-            let playfield = fromString 6 3 testInputString
+            let playfield    = fromString 6 3 testInputString
                 newPlayfield = Playfield.putChar playfield (-1, -1) '-'
             (V.toList $ playfieldRaw newPlayfield)
                 `shouldBe` (V.toList $ playfieldRaw playfield)

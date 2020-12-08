@@ -20,7 +20,7 @@ type Stack = [Int]
 pop :: State Stack Int
 pop = state pop'
   where
-    pop' [] = (0, [])
+    pop' []     = (0, [])
     pop' (x:xs) = (x, xs)
 
 push :: Int -> State Stack ()

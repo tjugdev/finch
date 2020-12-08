@@ -1,8 +1,8 @@
 module FunctionalSpec (spec) where
 
-import Test.Hspec
-import qualified Finch
 import qualified Data.Vector.Unboxed as V
+import qualified Finch
+import Test.Hspec
 
 spec :: Spec
 spec = do

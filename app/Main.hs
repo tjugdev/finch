@@ -1,10 +1,10 @@
 module Main (main) where
 
-import Finch
 import Control.Exception (bracket)
+import Finch
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
-import System.IO (openFile, hGetContents, hClose, IOMode(ReadMode))
+import System.IO (IOMode (ReadMode), hClose, hGetContents, openFile)
 
 runFile :: String -> IO ()
 runFile file = bracket

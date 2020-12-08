@@ -5,12 +5,12 @@ module Finch
     ) where
 
 import qualified Commands as Cmd
-import qualified Stack
 import qualified Playfield as P
+import qualified Stack
 --import qualified FinchIO
-import Control.Monad.State (State, execState, runState)
 import Control.Monad.Loops (iterateUntilM)
-import Data.Char (chr, ord, isDigit, digitToInt)
+import Control.Monad.State (State, execState, runState)
+import Data.Char (chr, digitToInt, isDigit, ord)
 import System.Random (randomIO)
 
 type PC = (Int, Int)
@@ -19,22 +19,22 @@ type PC = (Int, Int)
 data Direction = DirL | DirR | DirU | DirD deriving (Show, Eq, Enum)
 
 data ProgramState = ProgramState
-    { statePlayfield :: !P.Playfield
-    , statePC :: !PC
-    , stateStack :: !Stack.Stack
+    { statePlayfield        :: !P.Playfield
+    , statePC               :: !PC
+    , stateStack            :: !Stack.Stack
     , stateCurrentDirection :: !Direction
-    , stateFinished :: !Bool
-    , stateStringMode :: !Bool
+    , stateFinished         :: !Bool
+    , stateStringMode       :: !Bool
     } deriving (Show, Eq)
 
 initialProgramState :: P.Playfield -> ProgramState
 initialProgramState pf = ProgramState
-    { statePlayfield = pf
-    , statePC = (0, 0)
-    , stateStack = []
+    { statePlayfield  = pf
+    , statePC         = (0, 0)
+    , stateStack      = []
     , stateCurrentDirection = DirR
-    , stateFinished = False
-    , stateStringMode  = False
+    , stateFinished   = False
+    , stateStringMode = False
     }
 
 getCurrentChar :: ProgramState -> Char
@@ -44,13 +44,13 @@ advancePC :: ProgramState -> ProgramState
 advancePC ps = ps { statePC = newPC }
   where
     (x, y) = statePC ps
-    w = P.playfieldWidth $ statePlayfield ps
-    h = P.playfieldHeight $ statePlayfield ps
-    newPC = case stateCurrentDirection ps of
-                DirL -> (x - 1 `mod` w, y)
-                DirR -> (x + 1 `mod` w, y)
-                DirU -> (x, y - 1 `mod` h)
-                DirD -> (x, y + 1 `mod` h)
+    w      = P.playfieldWidth $ statePlayfield ps
+    h      = P.playfieldHeight $ statePlayfield ps
+    newPC  = case stateCurrentDirection ps of
+                 DirL -> (x - 1 `mod` w, y)
+                 DirR -> (x + 1 `mod` w, y)
+                 DirU -> (x, y - 1 `mod` h)
+                 DirD -> (x, y + 1 `mod` h)
 
 modifyStack :: ProgramState -> (State Stack.Stack a) -> ProgramState
 modifyStack ps s = ps { stateStack = newStack }
@@ -60,7 +60,7 @@ modifyStack ps s = ps { stateStack = newStack }
 directionalIf :: (Direction, Direction) -> ProgramState -> ProgramState
 directionalIf (d1, d2) ps = ps
     { stateCurrentDirection = if topZero then d1 else d2
-    , stateStack = newStack
+    , stateStack            = newStack
     }
   where
     (topZero, newStack) = runState (fmap (== 0) Stack.pop) (stateStack ps)
@@ -160,19 +160,19 @@ processCurrentCmd ps = case cmd of
 handleStringMode :: ProgramState -> ProgramState
 handleStringMode ps = ps
     { stateStringMode = newStringMode
-    , stateStack = newStack
+    , stateStack      = newStack
     }
   where
-    ch = P.getChar (statePlayfield ps) (statePC ps)
+    ch            = P.getChar (statePlayfield ps) (statePC ps)
     newStringMode = ch /= Cmd.StringMode
     newStack
         | newStringMode = execState (Stack.push $ ord ch) (stateStack ps)
-        | otherwise = stateStack ps
+        | otherwise     = stateStack ps
 
 processCurrentChar :: ProgramState -> IO ProgramState
 processCurrentChar ps
     | stateStringMode ps = return $ handleStringMode ps
-    | otherwise = processCurrentCmd ps
+    | otherwise          = processCurrentCmd ps
 
 step :: ProgramState -> IO ProgramState
 step = (fmap advancePC) . processCurrentChar
@@ -182,7 +182,7 @@ run = iterateUntilM stateFinished step
 
 runString :: Int -> Int -> String -> IO ProgramState
 runString width height input = do
-    let playfield = P.fromString width height input
+    let playfield    = P.fromString width height input
         programState = initialProgramState playfield
     run programState
 
