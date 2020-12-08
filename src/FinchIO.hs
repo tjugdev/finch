@@ -3,7 +3,7 @@
 module FinchIO
     ( FinchIO (getLine, getChar, print)
     , makeMockStdio
-    , MockStdio (stdout)
+    , MockStdio (mockStdout)
     ) where
 
 import Control.Monad.State
@@ -19,29 +19,29 @@ instance FinchIO IO where
     print = Prelude.putStr
 
 data MockStdio = MockStdio
-    { stdinChars   :: String
-    , stdinStrings :: [String]
-    , stdout       :: String
+    { mockStdin  :: String
+    , mockStdout :: String
     } deriving (Show, Eq)
 
 instance FinchIO (State MockStdio) where
   getLine = state getLine'
     where
-      getLine' mockStdio@(MockStdio _ (nextLine:remainingLines) _) =
-          (nextLine, mockStdio { stdinStrings = remainingLines })
-      getLine' mockStdio@(MockStdio _ [] _) = ("", mockStdio)
+      formatResult mockStdio (res, rest)
+          | rest == [] = (res, mockStdio { mockStdin = [] })
+          | otherwise  = (res, mockStdio { mockStdin = tail rest })
+      getLine' mockStdio@(MockStdio stdin _)
+          | stdin  == [] = ("", mockStdio { mockStdin = [] })
+          | otherwise    = formatResult mockStdio $ break (== '\n') stdin
+
   getChar = state getChar'
     where
-      getChar' mockStdio@(MockStdio (nextChar:chars) _ _) =
-          (nextChar, mockStdio { stdinChars = chars })
-      getChar' mockStdio@(MockStdio [] _ _) = ('\0', mockStdio)
-  print str = state $ \mockStdio@(MockStdio _ _ prevStdout) ->
-      ((), mockStdio { stdout = prevStdout ++ str })
+      getChar' mockStdio@(MockStdio stdin _)
+          | stdin == [] = ('\0', mockStdio { mockStdin = [] })
+          | otherwise   = (head stdin, mockStdio { mockStdin = tail stdin })
 
+  print str = state print'
+    where
+      print' mockStdio = ((), mockStdio { mockStdout = (mockStdout mockStdio ++ str) })
 
-makeMockStdio :: String -> [String] -> MockStdio
-makeMockStdio inChars inStrings = MockStdio
-    { stdinChars   = inChars
-    , stdinStrings = inStrings
-    , stdout       = ""
-    }
+makeMockStdio :: String -> MockStdio
+makeMockStdio stdin = MockStdio { mockStdin = stdin, mockStdout = "" }
