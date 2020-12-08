@@ -1,4 +1,17 @@
-module Stack where
+module Stack
+    ( Stack
+    , pop
+    , push
+    , add
+    , Stack.subtract
+    , multiply
+    , divide
+    , modulo
+    , duplicate
+    , swap
+    , Stack.not
+    , greaterThan
+    ) where
 
 import Control.Monad.State
 

@@ -26,8 +26,8 @@ data MockStdio = MockStdio { stdinChars :: String
 instance FinchIO (State MockStdio) where
   getLine = state getLine'
     where
-      getLine' mockStdio@(MockStdio _ (nextLine:lines) _) =
-          (nextLine, mockStdio { stdinStrings = lines })
+      getLine' mockStdio@(MockStdio _ (nextLine:remainingLines) _) =
+          (nextLine, mockStdio { stdinStrings = remainingLines })
       getLine' mockStdio@(MockStdio _ [] _) = ("", mockStdio)
   getChar = state getChar'
     where

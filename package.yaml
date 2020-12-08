@@ -29,6 +29,19 @@ dependencies:
 
 library:
   source-dirs: src
+  ghc-options:
+  - -threaded
+  - -rtsopts
+  - -with-rtsopts=-N
+  - -Werror
+  - -Wall
+  - -Wcompat
+  - -Widentities
+  - -Wincomplete-uni-patterns
+  - -Wincomplete-record-updates
+  - -Wmissing-export-lists
+  - -Wpartial-fields
+  #- -Wmissing-deriving-strategies
 
 executables:
   finch-exe:
@@ -39,15 +52,14 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     - -Werror
-    - -fwarn-tabs
-    - -fwarn-unused-imports
-    - -fwarn-missing-signatures
-    - -fwarn-name-shadowing
-    - -fwarn-incomplete-patterns
-    - -fwarn-incomplete-uni-patterns
-    - -fwarn-overlapping-patterns
-    - -fwarn-missing-signatures
-    - -fwarn-incomplete-record-updates
+    - -Wall
+    - -Wcompat
+    - -Widentities
+    - -Wincomplete-uni-patterns
+    - -Wincomplete-record-updates
+    - -Wmissing-export-lists
+    - -Wpartial-fields
+    #- -Wmissing-deriving-strategies
 
     dependencies:
     - finch
