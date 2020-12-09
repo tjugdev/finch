@@ -30,15 +30,15 @@ spec = do
             (playfieldHeight playfield) `shouldBe` 1
 
     describe "getChar" $ do
-        it "should getacorrect character when location is valid" $ do
+        it "should get correct character when location is valid" $ do
             let playfield = fromString 6 3 testInputString
                 ch        = Playfield.getChar playfield (2, 1)
-            ch `shouldBe` '+'
+            ch `shouldBe` Just '+'
 
-        it "should get correct character when location is invalid" $ do
+        it "should get Nothing when location is invalid" $ do
             let playfield = fromString 6 3 testInputString
                 ch        = Playfield.getChar playfield (-1, -1)
-            ch `shouldBe` ' '
+            ch `shouldBe` Nothing
 
     describe "putChar" $ do
         it "should put character when location is valid" $ do

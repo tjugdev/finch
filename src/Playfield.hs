@@ -32,10 +32,10 @@ standardHeight = 25
 validLocation :: Playfield -> (Int, Int) -> Bool
 validLocation (Playfield w h _) (x, y) = x >= 0 && x < w && y >= 0 && y < h
 
-getChar :: Playfield -> (Int, Int) -> Char
+getChar :: Playfield -> (Int, Int) -> Maybe Char
 getChar playfield@(Playfield w  _ raw) loc@(x, y)
-    | validLocation playfield loc = raw ! (y * w + x)
-    | otherwise                   = ' '
+    | validLocation playfield loc = Just $ raw ! (y * w + x)
+    | otherwise                   = Nothing
 
 putChar :: Playfield -> (Int, Int) -> Char -> Playfield
 putChar playfield@(Playfield w _ raw) (x, y) ch = playfield { playfieldRaw = newRaw }

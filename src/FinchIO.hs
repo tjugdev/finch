@@ -4,7 +4,6 @@ module FinchIO
     ( FinchIO (getLine, getChar, print, random)
     , MockIO (mockStdout)
     , makeMockIO
-    , makeMockIOWithRandom
     ) where
 
 import Control.Monad.State
@@ -55,12 +54,9 @@ instance FinchIO (State MockIO) where
             | otherwise =
                 (head randomStream, mockIO { mockRandomStream = tail randomStream })
 
-makeMockIOWithRandom :: String -> [Int] -> MockIO
-makeMockIOWithRandom stdin randomStream = MockIO
+makeMockIO :: String -> [Int] -> MockIO
+makeMockIO stdin randomStream = MockIO
     { mockStdin = stdin
     , mockStdout = ""
     , mockRandomStream = randomStream
     }
-
-makeMockIO :: String -> MockIO
-makeMockIO stdin = makeMockIOWithRandom stdin []

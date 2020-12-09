@@ -8,6 +8,7 @@ import qualified Commands as Cmd
 import Control.Monad.Loops (iterateUntilM)
 import Control.Monad.State (State, execState, runState)
 import Data.Char (chr, digitToInt, isDigit, ord)
+import Data.Maybe (fromJust)
 import FinchIO (FinchIO)
 import qualified FinchIO as FIO
 import qualified Playfield as P
@@ -38,7 +39,7 @@ initialProgramState pf = ProgramState
     }
 
 getCurrentChar :: ProgramState -> Char
-getCurrentChar ps = P.getChar (statePlayfield ps) (statePC ps)
+getCurrentChar ps = fromJust $ P.getChar (statePlayfield ps) (statePC ps)
 
 advancePC :: ProgramState -> ProgramState
 advancePC ps = ps { statePC = newPC }
@@ -47,10 +48,10 @@ advancePC ps = ps { statePC = newPC }
     w      = P.playfieldWidth $ statePlayfield ps
     h      = P.playfieldHeight $ statePlayfield ps
     newPC  = case stateCurrentDirection ps of
-                 DirL -> (x - 1 `mod` w, y)
-                 DirR -> (x + 1 `mod` w, y)
-                 DirU -> (x, y - 1 `mod` h)
-                 DirD -> (x, y + 1 `mod` h)
+                 DirL -> ((x - 1) `mod` w, y)
+                 DirR -> ((x + 1) `mod` w, y)
+                 DirU -> (x, (y - 1) `mod` h)
+                 DirD -> (x, (y + 1) `mod` h)
 
 modifyStack :: ProgramState -> (State S.Stack a) -> ProgramState
 modifyStack ps s = ps { stateStack = newStack }
@@ -74,13 +75,13 @@ verticalIf = directionalIf (DirD, DirU)
 popPrintInteger :: FinchIO m => ProgramState -> m ProgramState
 popPrintInteger ps = do
     let (top, newStack) = runState S.pop $ stateStack ps
-    FIO.print $ show top
+    FIO.print $ show top ++ " "
     return ps { stateStack = newStack }
 
 popPrintChar :: FinchIO m => ProgramState -> m ProgramState
 popPrintChar ps = do
     let (top, newStack) = runState S.pop $ stateStack ps
-    FIO.print $ [chr top]
+    FIO.print $ [chr $ top `mod` 255]
     return ps { stateStack = newStack }
 
 pushReadInteger :: FinchIO m => ProgramState -> m ProgramState
@@ -97,7 +98,7 @@ handleGet :: ProgramState -> ProgramState
 handleGet ps = modifyStack ps $ do
     y <- S.pop
     x <- S.pop
-    S.push $ ord $ P.getChar (statePlayfield ps) (x, y)
+    S.push $ maybe 0 ord $ P.getChar (statePlayfield ps) (x, y)
 
 handlePut :: ProgramState -> ProgramState
 handlePut ps = ps { stateStack = newStack, statePlayfield = newPlayfield }
@@ -163,7 +164,7 @@ handleStringMode ps = ps
     , stateStack      = newStack
     }
   where
-    ch            = P.getChar (statePlayfield ps) (statePC ps)
+    ch            = fromJust $ P.getChar (statePlayfield ps) (statePC ps)
     newStringMode = ch /= Cmd.StringMode
     newStack
         | newStringMode = execState (S.push $ ord ch) (stateStack ps)

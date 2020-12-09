@@ -70,7 +70,7 @@ pattern HorizontalIf :: Char
 pattern HorizontalIf = '_'
 
 pattern VerticalIf :: Char
-pattern VerticalIf = '_'
+pattern VerticalIf = '|'
 
 pattern StringMode :: Char
 pattern StringMode = '"'
