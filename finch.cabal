@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2646cb5bb7df363483f71ac2c00ad77a3c93416275d1aefd04c62b588924b434
+-- hash: cae7180c121ad8f3843074708871489f6905fd407098c197816ace16852a3f70
 
 name:           finch
 version:        0.1.0.0
@@ -88,6 +88,7 @@ test-suite unit-tests
   main-is: Spec.hs
   other-modules:
       PlayfieldSpec
+      StackSpec
       Paths_finch
   hs-source-dirs:
       test/unit
