@@ -86,11 +86,13 @@ popPrintChar ps = do
 
 pushReadInteger :: FinchIO m => ProgramState -> m ProgramState
 pushReadInteger ps = do
+    FIO.flushOutputBuffer
     str <- FIO.getLine
     return $ modifyStack ps (S.push $ read str)
 
 pushReadChar :: FinchIO m => ProgramState -> m ProgramState
 pushReadChar ps = do
+    FIO.flushOutputBuffer
     ch <- FIO.getChar
     return $ modifyStack ps (S.push $ ord ch)
 
@@ -112,6 +114,25 @@ handlePut ps = ps { stateStack = newStack, statePlayfield = newPlayfield }
     pf = statePlayfield ps;
     newPlayfield = P.putChar pf (x, y) (chr val)
 
+handleDivisionLike
+    :: FinchIO m
+    => ProgramState
+    -> State S.Stack (Maybe Int)
+    -> m ProgramState
+handleDivisionLike ps stackOp = do
+    val <- valueToPush
+    let newStack = execState (S.push val) stackAfterPop
+    return ps { stateStack = newStack }
+  where
+    (res, stackAfterPop) = runState stackOp $ stateStack ps
+    valueToPush = case res of
+                      Just n -> return n
+                      Nothing -> do
+                          FIO.print "What should the result be? "
+                          FIO.flushOutputBuffer
+                          desiredResult <- FIO.getLine
+                          return $ read desiredResult
+
 moveRandom :: FinchIO m => ProgramState -> m ProgramState
 moveRandom ps = do
     r <- FIO.random
@@ -128,16 +149,16 @@ processCurrentCmd ps = case cmd of
     Cmd.PromptInteger -> pushReadInteger ps
     Cmd.PromptChar -> pushReadChar ps
     Cmd.MoveRandom -> moveRandom ps
+    Cmd.Div -> handleDivisionLike ps S.divide
+    Cmd.Mod -> handleDivisionLike ps S.modulo
     _ -> return $
         case cmd of
             Cmd.Noop -> ps
-            Cmd.Plus -> modifyStack ps S.add
-            Cmd.Minus -> modifyStack ps S.subtract
-            Cmd.Mult -> modifyStack ps S.multiply
-            Cmd.Div -> modifyStack ps S.divide
-            Cmd.Mod -> modifyStack ps S.modulo
-            Cmd.Not -> modifyStack ps S.not
-            Cmd.GreaterThan -> modifyStack ps S.greaterThan
+            Cmd.Plus -> modifyStack ps $ S.add >>= S.push
+            Cmd.Minus -> modifyStack ps $ S.subtract >>= S.push
+            Cmd.Mult -> modifyStack ps $ S.multiply >>= S.push
+            Cmd.Not -> modifyStack ps $ S.not >>= S.push
+            Cmd.GreaterThan -> modifyStack ps $ S.greaterThan >>= S.push
             Cmd.MoveRight -> ps { stateCurrentDirection = DirR }
             Cmd.MoveLeft -> ps { stateCurrentDirection = DirL }
             Cmd.MoveUp -> ps { stateCurrentDirection = DirU }

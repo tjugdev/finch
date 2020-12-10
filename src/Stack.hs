@@ -28,37 +28,35 @@ push = state . push'
   where
     push' x xs = ((), (x:xs))
 
-add :: State Stack ()
+add :: State Stack Int
 add = do
     v1 <- pop
     v2 <- pop
-    push (v2 + v1)
+    return $ v2 + v1
 
-subtract :: State Stack ()
+subtract :: State Stack Int
 subtract = do
     v1 <- pop
     v2 <- pop
-    push (v2 - v1)
+    return $ v2 - v1
 
-multiply :: State Stack ()
+multiply :: State Stack Int
 multiply = do
     v1 <- pop
     v2 <- pop
-    push (v2 * v1)
+    return $ v2 * v1
 
--- TODO Division by zero?
-divide :: State Stack ()
+divide :: State Stack (Maybe Int)
 divide = do
     v1 <- pop
     v2 <- pop
-    push (v2 `div` v1)
+    return $ if v1 == 0 then Nothing else Just (v2 `div` v1)
 
--- TODO Division by zero?
-modulo :: State Stack ()
+modulo :: State Stack (Maybe Int)
 modulo = do
     v1 <- pop
     v2 <- pop
-    push (v2 `mod` v1)
+    return $ if v1 == 0 then Nothing else Just (v2 `mod` v1)
 
 duplicate :: State Stack ()
 duplicate = do
@@ -73,13 +71,13 @@ swap = do
     push v1
     push v2
 
-not :: State Stack ()
+not :: State Stack Int
 not = do
     v1 <- pop
-    push $ if v1 == 0 then 1 else 0
+    return $ if v1 == 0 then 1 else 0
 
-greaterThan :: State Stack ()
+greaterThan :: State Stack Int
 greaterThan = do
     v1 <- pop
     v2 <- pop
-    push $ if v2 > v1 then 1 else 0
+    return $ if v2 > v1 then 1 else 0

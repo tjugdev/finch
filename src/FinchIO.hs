@@ -1,12 +1,13 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module FinchIO
-    ( FinchIO (getLine, getChar, print, random)
+    ( FinchIO (getLine, getChar, print, random, flushOutputBuffer)
     , MockIO (mockStdout)
     , makeMockIO
     ) where
 
 import Control.Monad.State
+import System.IO (hFlush, stdout)
 import System.Random (randomIO)
 
 class Monad m => FinchIO m where
@@ -14,12 +15,14 @@ class Monad m => FinchIO m where
     getChar :: m Char
     print :: String -> m ()
     random :: m Int
+    flushOutputBuffer :: m ()
 
 instance FinchIO IO where
     getLine = Prelude.getLine
     getChar = Prelude.getChar
     print = Prelude.putStr
-    random = randomIO :: IO Int
+    random = randomIO
+    flushOutputBuffer = hFlush stdout
 
 data MockIO = MockIO
     { mockStdin        :: String
@@ -53,6 +56,8 @@ instance FinchIO (State MockIO) where
             | randomStream == [] = (0, mockIO { mockRandomStream = [] })
             | otherwise =
                 (head randomStream, mockIO { mockRandomStream = tail randomStream })
+
+    flushOutputBuffer = return ()
 
 makeMockIO :: String -> [Int] -> MockIO
 makeMockIO stdin randomStream = MockIO
