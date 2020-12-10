@@ -26,6 +26,7 @@ dependencies:
 - split
 - monad-loops
 - random
+- safe
 
 library:
   source-dirs: src

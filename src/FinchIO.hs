@@ -1,12 +1,13 @@
 {-# LANGUAGE FlexibleInstances    #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 module FinchIO
-    ( FinchIO (getLine, getChar, print, random, flushOutputBuffer)
+    ( FinchIO (getLine, getChar, print, random)
     , MockIO (mockStdout)
     , makeMockIO
     ) where
 
 import Control.Monad.State
+import Safe (headDef, tailSafe)
 import System.IO (hFlush, stdout)
 import System.Random (randomIO)
 
@@ -15,14 +16,12 @@ class Monad m => FinchIO m where
     getChar :: m Char
     print :: String -> m ()
     random :: m Int
-    flushOutputBuffer :: m ()
 
 instance FinchIO IO where
-    getLine = Prelude.getLine
-    getChar = Prelude.getChar
+    getLine = hFlush stdout >> Prelude.getLine
+    getChar = hFlush stdout >> Prelude.getChar
     print = Prelude.putStr
     random = randomIO
-    flushOutputBuffer = hFlush stdout
 
 data MockIO = MockIO
     { mockStdin        :: String
@@ -33,18 +32,13 @@ data MockIO = MockIO
 instance FinchIO (State MockIO) where
     getLine = state getLine'
       where
-        formatResult mockIO (res, rest)
-            | rest == [] = (res, mockIO { mockStdin = [] })
-            | otherwise  = (res, mockIO { mockStdin = tail rest })
-        getLine' mockIO@(MockIO stdin _ _)
-            | stdin  == [] = ("", mockIO { mockStdin = [] })
-            | otherwise    = formatResult mockIO $ break (== '\n') stdin
+        formatResult mockIO (res, rest) = (res, mockIO { mockStdin = tailSafe rest })
+        getLine' mockIO@(MockIO stdin _ _) = formatResult mockIO $ break (== '\n') stdin
 
     getChar = state getChar'
       where
-        getChar' mockIO@(MockIO stdin _ _)
-            | stdin == [] = ('\0', mockIO { mockStdin = [] })
-            | otherwise   = (head stdin, mockIO { mockStdin = tail stdin })
+        getChar' mockIO@(MockIO stdin _ _) =
+            (headDef '\0' stdin, mockIO { mockStdin = tailSafe stdin })
 
     print str = state print'
       where
@@ -52,12 +46,8 @@ instance FinchIO (State MockIO) where
 
     random = state random'
       where
-        random' mockIO@(MockIO _ _ randomStream)
-            | randomStream == [] = (0, mockIO { mockRandomStream = [] })
-            | otherwise =
-                (head randomStream, mockIO { mockRandomStream = tail randomStream })
-
-    flushOutputBuffer = return ()
+        random' mockIO@(MockIO _ _ randomStream) =
+            (headDef 0 randomStream, mockIO { mockRandomStream = tailSafe randomStream })
 
 makeMockIO :: String -> [Int] -> MockIO
 makeMockIO stdin randomStream = MockIO

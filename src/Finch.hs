@@ -92,13 +92,11 @@ popPrintChar ps = do
 
 pushReadInteger :: FinchIO m => ProgramState -> m ProgramState
 pushReadInteger ps = do
-    FIO.flushOutputBuffer
     str <- FIO.getLine
     return $ modifyStack ps (S.push $ stringToInteger str)
 
 pushReadChar :: FinchIO m => ProgramState -> m ProgramState
 pushReadChar ps = do
-    FIO.flushOutputBuffer
     ch <- FIO.getChar
     return $ modifyStack ps (S.push $ ord ch)
 
@@ -142,7 +140,6 @@ handleDivisionLike ps op = do
                       (Just n, _, _) -> return n
                       (Nothing, x, _) -> do
                           FIO.print $ divisionByZeroPrompt x
-                          FIO.flushOutputBuffer
                           desiredResult <- FIO.getLine
                           return $ stringToInteger desiredResult
 
@@ -176,7 +173,7 @@ processCurrentCmd ps = case cmd of
             Cmd.Minus -> applyStackOp ps (-)
             Cmd.Mult -> applyStackOp ps (*)
             Cmd.Not -> modifyStack ps $
-                (\x -> if x == 0 then 1 else 0) <$> S.pop  >>= S.push
+                (\x -> if x == 0 then 1 else 0) <$> S.pop >>= S.push
             Cmd.GreaterThan -> applyStackOp ps (\x y -> if x > y then 1 else 0)
             Cmd.MoveRight -> ps { stateCurrentDirection = DirR }
             Cmd.MoveLeft -> ps { stateCurrentDirection = DirL }
