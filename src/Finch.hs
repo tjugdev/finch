@@ -5,6 +5,7 @@ module Finch
     ) where
 
 import qualified Commands as Cmd
+import Control.Applicative (liftA2)
 import Control.Monad.Loops (iterateUntilM)
 import Control.Monad.State (State, execState, runState)
 import Data.Char (chr, digitToInt, isDigit, ord)
@@ -13,6 +14,8 @@ import FinchIO (FinchIO)
 import qualified FinchIO as FIO
 import qualified Playfield as P
 import qualified Stack as S
+import Text.Printf (printf)
+import Text.Read (readMaybe)
 
 type PC = (Int, Int)
 
@@ -53,6 +56,9 @@ advancePC ps = ps { statePC = newPC }
                  DirU -> (x, (y - 1) `mod` h)
                  DirD -> (x, (y + 1) `mod` h)
 
+stringToInteger :: String -> Int
+stringToInteger str = maybe 0 truncate (readMaybe str :: Maybe Double)
+
 modifyStack :: ProgramState -> (State S.Stack a) -> ProgramState
 modifyStack ps s = ps { stateStack = newStack }
   where
@@ -88,7 +94,7 @@ pushReadInteger :: FinchIO m => ProgramState -> m ProgramState
 pushReadInteger ps = do
     FIO.flushOutputBuffer
     str <- FIO.getLine
-    return $ modifyStack ps (S.push $ read str)
+    return $ modifyStack ps (S.push $ stringToInteger str)
 
 pushReadChar :: FinchIO m => ProgramState -> m ProgramState
 pushReadChar ps = do
@@ -114,24 +120,31 @@ handlePut ps = ps { stateStack = newStack, statePlayfield = newPlayfield }
     pf = statePlayfield ps;
     newPlayfield = P.putChar pf (x, y) (chr val)
 
+divisionByZeroPrompt :: Int -> String
+divisionByZeroPrompt = printf "What do you want %ld/0 to be? "
+
 handleDivisionLike
     :: FinchIO m
     => ProgramState
-    -> State S.Stack (Maybe Int)
+    -> (Int -> Int -> Int)
     -> m ProgramState
-handleDivisionLike ps stackOp = do
+handleDivisionLike ps op = do
     val <- valueToPush
     let newStack = execState (S.push val) stackAfterPop
     return ps { stateStack = newStack }
   where
-    (res, stackAfterPop) = runState stackOp $ stateStack ps
+    (res, stackAfterPop) = (flip runState) (stateStack ps) $ do
+        v1 <- S.pop
+        v2 <- S.pop
+        let result = if v1 == 0 then Nothing else Just (op v2 v1)
+        return $ (result, v2, v1)
     valueToPush = case res of
-                      Just n -> return n
-                      Nothing -> do
-                          FIO.print "What should the result be? "
+                      (Just n, _, _) -> return n
+                      (Nothing, x, _) -> do
+                          FIO.print $ divisionByZeroPrompt x
                           FIO.flushOutputBuffer
                           desiredResult <- FIO.getLine
-                          return $ read desiredResult
+                          return $ stringToInteger desiredResult
 
 moveRandom :: FinchIO m => ProgramState -> m ProgramState
 moveRandom ps = do
@@ -142,6 +155,9 @@ moveRandom ps = do
 toggleStringMode :: ProgramState -> ProgramState
 toggleStringMode ps = ps { stateStringMode = (not . stateStringMode) ps }
 
+applyStackOp :: ProgramState -> (Int -> Int -> Int) -> ProgramState
+applyStackOp ps op = modifyStack ps $ liftA2 (flip op) S.pop S.pop >>= S.push
+
 processCurrentCmd :: FinchIO m => ProgramState -> m ProgramState
 processCurrentCmd ps = case cmd of
     Cmd.PopPrintInteger -> popPrintInteger ps
@@ -149,16 +165,19 @@ processCurrentCmd ps = case cmd of
     Cmd.PromptInteger -> pushReadInteger ps
     Cmd.PromptChar -> pushReadChar ps
     Cmd.MoveRandom -> moveRandom ps
-    Cmd.Div -> handleDivisionLike ps S.divide
-    Cmd.Mod -> handleDivisionLike ps S.modulo
+    Cmd.Div -> handleDivisionLike ps div
+    -- Reference implementation actualy crashes when computing n % 0
+    -- We choose to handle it the same as division by 0
+    Cmd.Mod -> handleDivisionLike ps mod
     _ -> return $
         case cmd of
             Cmd.Noop -> ps
-            Cmd.Plus -> modifyStack ps $ S.add >>= S.push
-            Cmd.Minus -> modifyStack ps $ S.subtract >>= S.push
-            Cmd.Mult -> modifyStack ps $ S.multiply >>= S.push
-            Cmd.Not -> modifyStack ps $ S.not >>= S.push
-            Cmd.GreaterThan -> modifyStack ps $ S.greaterThan >>= S.push
+            Cmd.Plus -> applyStackOp ps (+)
+            Cmd.Minus -> applyStackOp ps (-)
+            Cmd.Mult -> applyStackOp ps (*)
+            Cmd.Not -> modifyStack ps $
+                (\x -> if x == 0 then 1 else 0) <$> S.pop  >>= S.push
+            Cmd.GreaterThan -> applyStackOp ps (\x y -> if x > y then 1 else 0)
             Cmd.MoveRight -> ps { stateCurrentDirection = DirR }
             Cmd.MoveLeft -> ps { stateCurrentDirection = DirL }
             Cmd.MoveUp -> ps { stateCurrentDirection = DirU }
