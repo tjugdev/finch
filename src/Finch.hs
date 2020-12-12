@@ -1,11 +1,10 @@
 module Finch
     ( runString
     , runStringStandardSize
-    , runStringStandardSize_
     ) where
 
 import qualified Commands as Cmd
-import Control.Applicative (liftA2)
+import Control.Monad (liftM2, liftM3)
 import Control.Monad.Loops (iterateUntilM)
 import Control.Monad.State (State, execState, runState)
 import Data.Char (chr, digitToInt, isDigit, ord)
@@ -19,7 +18,6 @@ import Text.Read (readMaybe)
 
 type PC = (Int, Int)
 
--- Interpreter
 data Direction = DirL | DirR | DirU | DirD deriving (Show, Eq, Enum)
 
 data ProgramState = ProgramState
@@ -33,13 +31,19 @@ data ProgramState = ProgramState
 
 initialProgramState :: P.Playfield -> ProgramState
 initialProgramState pf = ProgramState
-    { statePlayfield  = pf
-    , statePC         = (0, 0)
-    , stateStack      = []
+    { statePlayfield   = pf
+    , statePC          = (0, 0)
+    , stateStack       = []
     , stateCurrentDirection = DirR
-    , stateFinished   = False
-    , stateStringMode = False
+    , stateFinished    = False
+    , stateStringMode  = False
     }
+
+setDirection :: ProgramState -> Direction -> ProgramState
+setDirection ps dir = ps { stateCurrentDirection = dir }
+
+setStack :: ProgramState -> S.Stack -> ProgramState
+setStack ps stack = ps { stateStack = stack }
 
 getCurrentChar :: ProgramState -> Char
 getCurrentChar ps = fromJust $ P.getChar (statePlayfield ps) (statePC ps)
@@ -60,9 +64,7 @@ stringToInteger :: String -> Int
 stringToInteger str = maybe 0 truncate (readMaybe str :: Maybe Double)
 
 modifyStack :: ProgramState -> (State S.Stack a) -> ProgramState
-modifyStack ps s = ps { stateStack = newStack }
-  where
-    newStack = execState s $ stateStack ps
+modifyStack ps s = setStack ps $ execState s $ stateStack ps
 
 directionalIf :: (Direction, Direction) -> ProgramState -> ProgramState
 directionalIf (d1, d2) ps = ps
@@ -82,78 +84,57 @@ popPrintInteger :: FinchIO m => ProgramState -> m ProgramState
 popPrintInteger ps = do
     let (top, newStack) = runState S.pop $ stateStack ps
     FIO.print $ show top ++ " "
-    return ps { stateStack = newStack }
+    return $ setStack ps newStack
 
 popPrintChar :: FinchIO m => ProgramState -> m ProgramState
 popPrintChar ps = do
     let (top, newStack) = runState S.pop $ stateStack ps
     FIO.print $ [chr $ top `mod` 255]
-    return ps { stateStack = newStack }
+    return $ setStack ps newStack
 
 pushReadInteger :: FinchIO m => ProgramState -> m ProgramState
-pushReadInteger ps = do
-    str <- FIO.getLine
-    return $ modifyStack ps (S.push $ stringToInteger str)
+pushReadInteger ps = modifyStack ps <$> S.push .stringToInteger <$> FIO.getLine
 
 pushReadChar :: FinchIO m => ProgramState -> m ProgramState
-pushReadChar ps = do
-    ch <- FIO.getChar
-    return $ modifyStack ps (S.push $ ord ch)
+pushReadChar ps = modifyStack ps <$> S.push . ord <$> FIO.getChar
 
 handleGet :: ProgramState -> ProgramState
-handleGet ps = modifyStack ps $ do
-    y <- S.pop
-    x <- S.pop
-    S.push $ maybe 0 ord $ P.getChar (statePlayfield ps) (x, y)
+handleGet ps = modifyStack ps $ getCharacter <$> liftM2 (,) S.pop S.pop >>= S.push
+  where
+    getCharacter (y, x) = maybe 0 ord $ P.getChar (statePlayfield ps) (x, y)
 
 handlePut :: ProgramState -> ProgramState
 handlePut ps = ps { stateStack = newStack, statePlayfield = newPlayfield }
   where
-    stackAction = do
-        yVal <- S.pop
-        xVal <- S.pop
-        putVal <- S.pop
-        return ((xVal, yVal), putVal)
-    (((x, y), val), newStack) = runState stackAction $ stateStack ps
-    pf = statePlayfield ps;
-    newPlayfield = P.putChar pf (x, y) (chr val)
+    ((y, x, val), newStack) =
+        (flip runState) (stateStack ps) $ liftM3 (,,) S.pop S.pop S.pop
+    newPlayfield = P.putChar (statePlayfield ps) (x, y) (chr val)
 
 divisionByZeroPrompt :: Int -> String
 divisionByZeroPrompt = printf "What do you want %ld/0 to be? "
 
-handleDivisionLike
-    :: FinchIO m
-    => ProgramState
-    -> (Int -> Int -> Int)
-    -> m ProgramState
+handleDivisionLike :: FinchIO m => ProgramState -> (Int -> Int -> Int) -> m ProgramState
 handleDivisionLike ps op = do
     val <- valueToPush
     let newStack = execState (S.push val) stackAfterPop
     return ps { stateStack = newStack }
   where
-    (res, stackAfterPop) = (flip runState) (stateStack ps) $ do
-        v1 <- S.pop
-        v2 <- S.pop
-        let result = if v1 == 0 then Nothing else Just (op v2 v1)
-        return $ (result, v2, v1)
-    valueToPush = case res of
-                      (Just n, _, _) -> return n
-                      (Nothing, x, _) -> do
+    (values, stackAfterPop) = (flip runState) (stateStack ps) $ liftM2 (,) S.pop S.pop
+    valueToPush = case values of
+                      (0, x) -> do
                           FIO.print $ divisionByZeroPrompt x
                           desiredResult <- FIO.getLine
                           return $ stringToInteger desiredResult
+                      (y, x) -> return $ op x y
 
 moveRandom :: FinchIO m => ProgramState -> m ProgramState
-moveRandom ps = do
-    r <- FIO.random
-    let direction = toEnum (r `mod` 4)
-    return $ ps { stateCurrentDirection = direction }
+moveRandom ps = setDirection ps <$> toEnum <$> (flip mod 4) <$> FIO.random
 
 toggleStringMode :: ProgramState -> ProgramState
 toggleStringMode ps = ps { stateStringMode = (not . stateStringMode) ps }
 
 applyStackOp :: ProgramState -> (Int -> Int -> Int) -> ProgramState
-applyStackOp ps op = modifyStack ps $ liftA2 (flip op) S.pop S.pop >>= S.push
+applyStackOp ps op = modifyStack ps $ liftM2 (flip op) S.pop S.pop >>= S.push
 
 processCurrentCmd :: FinchIO m => ProgramState -> m ProgramState
 processCurrentCmd ps = case cmd of
@@ -175,10 +156,10 @@ processCurrentCmd ps = case cmd of
             Cmd.Not -> modifyStack ps $
                 (\x -> if x == 0 then 1 else 0) <$> S.pop >>= S.push
             Cmd.GreaterThan -> applyStackOp ps (\x y -> if x > y then 1 else 0)
-            Cmd.MoveRight -> ps { stateCurrentDirection = DirR }
-            Cmd.MoveLeft -> ps { stateCurrentDirection = DirL }
-            Cmd.MoveUp -> ps { stateCurrentDirection = DirU }
-            Cmd.MoveDown -> ps { stateCurrentDirection = DirD }
+            Cmd.MoveRight -> setDirection ps DirR
+            Cmd.MoveLeft -> setDirection ps DirL
+            Cmd.MoveUp -> setDirection ps DirU
+            Cmd.MoveDown -> setDirection ps DirD
             Cmd.HorizontalIf -> horizontalIf ps
             Cmd.VerticalIf -> verticalIf ps
             Cmd.StringMode -> toggleStringMode ps
@@ -201,16 +182,17 @@ handleStringMode ps = ps
     , stateStack      = newStack
     }
   where
-    ch            = fromJust $ P.getChar (statePlayfield ps) (statePC ps)
+    ch            = getCurrentChar ps
     newStringMode = ch /= Cmd.StringMode
-    newStack
-        | newStringMode = execState (S.push $ ord ch) (stateStack ps)
-        | otherwise     = stateStack ps
+    oldStack      = stateStack ps
+    newStack      = if newStringMode
+                       then execState (S.push $ ord ch) oldStack
+                       else oldStack
 
 processCurrentChar :: FinchIO m => ProgramState -> m ProgramState
-processCurrentChar ps
-    | stateStringMode ps = return $ handleStringMode ps
-    | otherwise          = processCurrentCmd ps
+processCurrentChar ps = if stateStringMode ps
+                           then return $ handleStringMode ps
+                           else processCurrentCmd ps
 
 step :: FinchIO m => ProgramState -> m ProgramState
 step = (fmap advancePC) . processCurrentChar
@@ -219,13 +201,10 @@ run :: FinchIO m => ProgramState -> m ProgramState
 run = iterateUntilM stateFinished step
 
 runString :: FinchIO m => Int -> Int -> String -> m ProgramState
-runString width height input = do
-    let playfield    = P.fromString width height input
-        programState = initialProgramState playfield
-    run programState
+runString width height input = run programState
+  where
+    playfield    = P.fromString width height input
+    programState = initialProgramState playfield
 
 runStringStandardSize :: FinchIO m => String -> m ProgramState
 runStringStandardSize = runString P.standardWidth P.standardHeight
-
-runStringStandardSize_ :: FinchIO m => String -> m ()
-runStringStandardSize_ inputString = runStringStandardSize inputString >> return ()

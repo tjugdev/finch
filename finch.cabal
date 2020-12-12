@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 3babbbbc38f39c5f334e317b04a3a4c01d65f0445b1d91bd57400839513fc45e
+-- hash: 8e7035bcd009e50cdece5c9463338225fb76a8df36d5ab3822a74c8f9f1d43f3
 
 name:           finch
 version:        0.1.0.0
@@ -36,6 +36,7 @@ library
       Paths_finch
   hs-source-dirs:
       src
+  default-extensions: FlexibleInstances OverloadedStrings TupleSections TypeSynonymInstances
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Werror -Wall -Wcompat -Widentities -Wincomplete-uni-patterns -Wincomplete-record-updates -Wmissing-export-lists -Wpartial-fields
   build-depends:
       base >=4.7 && <5

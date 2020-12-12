@@ -1,7 +1,7 @@
 module Main (main) where
 
 import Control.Exception (bracket)
-import Finch
+import Finch (runStringStandardSize)
 import System.Environment (getArgs)
 import System.Exit (exitFailure)
 import System.IO (IOMode (ReadMode), hClose, hGetContents, openFile)
@@ -10,7 +10,7 @@ runFile :: String -> IO ()
 runFile file = bracket
     (openFile file ReadMode)
     hClose
-    (\h -> hGetContents h >>= runStringStandardSize_)
+    (\h -> hGetContents h >>= runStringStandardSize >> return ())
 
 main :: IO ()
 main = do

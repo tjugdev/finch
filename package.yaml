@@ -30,6 +30,11 @@ dependencies:
 
 library:
   source-dirs: src
+  default-extensions:
+  - FlexibleInstances
+  - OverloadedStrings
+  - TupleSections
+  - TypeSynonymInstances
   ghc-options:
   - -threaded
   - -rtsopts
@@ -42,7 +47,6 @@ library:
   - -Wincomplete-record-updates
   - -Wmissing-export-lists
   - -Wpartial-fields
-  #- -Wmissing-deriving-strategies
 
 executables:
   finch-exe:
@@ -60,7 +64,6 @@ executables:
     - -Wincomplete-record-updates
     - -Wmissing-export-lists
     - -Wpartial-fields
-    #- -Wmissing-deriving-strategies
 
     dependencies:
     - finch

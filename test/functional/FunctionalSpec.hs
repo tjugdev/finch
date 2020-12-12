@@ -3,14 +3,14 @@ module FunctionalSpec (spec) where
 import Control.Monad.State (execState)
 import Data.List (intersperse)
 import qualified Data.Vector.Unboxed as V
-import Finch (runStringStandardSize_)
+import Finch (runStringStandardSize)
 import FinchIO (MockIO, makeMockIO, mockStdout)
 import Test.Hspec
 
 runProgram :: String -> String -> [Int] -> String
 runProgram src stdin randomStream = mockStdout $ execState result initialIO
   where
-    result    = runStringStandardSize_ src
+    result    = runStringStandardSize src
     initialIO = makeMockIO stdin randomStream
 
 spec :: Spec

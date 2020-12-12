@@ -1,5 +1,3 @@
-{-# LANGUAGE FlexibleInstances    #-}
-{-# LANGUAGE TypeSynonymInstances #-}
 module FinchIO
     ( FinchIO (getLine, getChar, print, random)
     , MockIO (mockStdout)
@@ -30,24 +28,17 @@ data MockIO = MockIO
     } deriving (Show, Eq)
 
 instance FinchIO (State MockIO) where
-    getLine = state getLine'
-      where
-        formatResult mockIO (res, rest) = (res, mockIO { mockStdin = tailSafe rest })
-        getLine' mockIO@(MockIO stdin _ _) = formatResult mockIO $ break (== '\n') stdin
+    getLine = state $ \mockIO@(MockIO stdin _ _) ->
+        (\x -> mockIO { mockStdin = tailSafe x }) <$> break (== '\n') stdin
 
-    getChar = state getChar'
-      where
-        getChar' mockIO@(MockIO stdin _ _) =
-            (headDef '\0' stdin, mockIO { mockStdin = tailSafe stdin })
+    getChar = state $ \mockIO@(MockIO stdin _ _) ->
+        (headDef '\0' stdin, mockIO { mockStdin = tailSafe stdin })
 
-    print str = state print'
-      where
-        print' mockIO = ((), mockIO { mockStdout = (mockStdout mockIO ++ str) })
+    print str = state $ \mockIO ->
+        ((), mockIO { mockStdout = (mockStdout mockIO ++ str) })
 
-    random = state random'
-      where
-        random' mockIO@(MockIO _ _ randomStream) =
-            (headDef 0 randomStream, mockIO { mockRandomStream = tailSafe randomStream })
+    random = state $ \mockIO@(MockIO _ _ randomStream) ->
+        (headDef 0 randomStream, mockIO { mockRandomStream = tailSafe randomStream })
 
 makeMockIO :: String -> [Int] -> MockIO
 makeMockIO stdin randomStream = MockIO
