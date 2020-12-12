@@ -128,3 +128,13 @@ spec = do
         let input = "9876543210..........@"
             stdout = runProgram input "" []
         stdout `shouldBe` "0 1 2 3 4 5 6 7 8 9 "
+
+    it "should handle division by zero according to the language spec" $ do
+        let input = "30/.@"
+            stdout = runProgram input "27\n" []
+        stdout `shouldBe` "What do you want 3/0 to be? 27 "
+
+    it "should handle modulo by zero the same as division by zero" $ do
+        let input = "30%.@"
+            stdout = runProgram input "27\n" []
+        stdout `shouldBe` "What do you want 3/0 to be? 27 "
