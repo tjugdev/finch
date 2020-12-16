@@ -17,9 +17,7 @@ pop = state pop'
     pop' (x:xs) = (x, xs)
 
 push :: Int -> State Stack ()
-push = state . push'
-  where
-    push' x xs = ((), (x:xs))
+push = state . (\x xs -> ((), (x:xs)))
 
 duplicate :: State Stack ()
 duplicate = do

@@ -11,6 +11,8 @@ import Data.Char (chr, digitToInt, isDigit, ord)
 import Data.Maybe (fromJust)
 import FinchIO (FinchIO)
 import qualified FinchIO as FIO
+import Optics (abbreviatedFields, makeFieldLabelsWith, set, traverseOf, (%), (%~), (&),
+               (.~), (^.))
 import qualified Playfield as P
 import qualified Stack as S
 import Text.Printf (printf)
@@ -28,6 +30,7 @@ data ProgramState = ProgramState
     , stateFinished         :: !Bool
     , stateStringMode       :: !Bool
     } deriving (Show, Eq)
+makeFieldLabelsWith abbreviatedFields ''ProgramState
 
 initialProgramState :: P.Playfield -> ProgramState
 initialProgramState pf = ProgramState
@@ -39,22 +42,16 @@ initialProgramState pf = ProgramState
     , stateStringMode  = False
     }
 
-setDirection :: ProgramState -> Direction -> ProgramState
-setDirection ps dir = ps { stateCurrentDirection = dir }
-
-setStack :: ProgramState -> S.Stack -> ProgramState
-setStack ps stack = ps { stateStack = stack }
-
 getCurrentChar :: ProgramState -> Char
-getCurrentChar ps = fromJust $ P.getChar (statePlayfield ps) (statePC ps)
+getCurrentChar ps = fromJust $ P.getChar (ps ^. #playfield) (ps ^. #pC)
 
 advancePC :: ProgramState -> ProgramState
-advancePC ps = ps { statePC = newPC }
+advancePC ps = set #pC newPC ps
   where
-    (x, y) = statePC ps
-    w      = P.playfieldWidth $ statePlayfield ps
-    h      = P.playfieldHeight $ statePlayfield ps
-    newPC  = case stateCurrentDirection ps of
+    (x, y) = ps ^. #pC
+    w      = ps ^. #playfield % #width
+    h      = ps ^. #playfield % #height
+    newPC  = case ps ^. #currentDirection of
                  DirL -> ((x - 1) `mod` w, y)
                  DirR -> ((x + 1) `mod` w, y)
                  DirU -> (x, (y - 1) `mod` h)
@@ -64,15 +61,13 @@ stringToInteger :: String -> Int
 stringToInteger str = maybe 0 truncate (readMaybe str :: Maybe Double)
 
 modifyStack :: ProgramState -> (State S.Stack a) -> ProgramState
-modifyStack ps s = setStack ps $ execState s $ stateStack ps
+modifyStack ps s = ps & #stack %~ execState s
 
 directionalIf :: (Direction, Direction) -> ProgramState -> ProgramState
-directionalIf (d1, d2) ps = ps
-    { stateCurrentDirection = if topZero then d1 else d2
-    , stateStack            = newStack
-    }
+directionalIf (d1, d2) ps = ps & #currentDirection .~ (if topZero then d1 else d2)
+                               & #stack .~ newStack
   where
-    (topZero, newStack) = runState (fmap (== 0) S.pop) (stateStack ps)
+    (topZero, newStack) = runState (fmap (== 0) S.pop) (ps ^. #stack)
 
 horizontalIf :: ProgramState -> ProgramState
 horizontalIf = directionalIf (DirR, DirL)
@@ -82,18 +77,18 @@ verticalIf = directionalIf (DirD, DirU)
 
 popPrintInteger :: FinchIO m => ProgramState -> m ProgramState
 popPrintInteger ps = do
-    let (top, newStack) = runState S.pop $ stateStack ps
+    let (top, newStack) = runState S.pop $ ps ^. #stack
     FIO.print $ show top ++ " "
-    return $ setStack ps newStack
+    return $ ps & #stack .~ newStack
 
 popPrintChar :: FinchIO m => ProgramState -> m ProgramState
 popPrintChar ps = do
-    let (top, newStack) = runState S.pop $ stateStack ps
+    let (top, newStack) = runState S.pop $ ps ^. #stack
     FIO.print $ [chr $ top `mod` 255]
-    return $ setStack ps newStack
+    return $ ps & #stack .~ newStack
 
 pushReadInteger :: FinchIO m => ProgramState -> m ProgramState
-pushReadInteger ps = modifyStack ps <$> S.push .stringToInteger <$> FIO.getLine
+pushReadInteger ps = modifyStack ps <$> S.push . stringToInteger <$> FIO.getLine
 
 pushReadChar :: FinchIO m => ProgramState -> m ProgramState
 pushReadChar ps = modifyStack ps <$> S.push . ord <$> FIO.getChar
@@ -101,14 +96,14 @@ pushReadChar ps = modifyStack ps <$> S.push . ord <$> FIO.getChar
 handleGet :: ProgramState -> ProgramState
 handleGet ps = modifyStack ps $ getCharacter <$> liftM2 (,) S.pop S.pop >>= S.push
   where
-    getCharacter (y, x) = maybe 0 ord $ P.getChar (statePlayfield ps) (x, y)
+    getCharacter (y, x) = maybe 0 ord $ P.getChar (ps ^. #playfield) (x, y)
 
 handlePut :: ProgramState -> ProgramState
-handlePut ps = ps { stateStack = newStack, statePlayfield = newPlayfield }
+handlePut ps = ps & #stack .~ newStack & #playfield .~ newPlayfield
   where
     ((y, x, val), newStack) =
-        (flip runState) (stateStack ps) $ liftM3 (,,) S.pop S.pop S.pop
-    newPlayfield = P.putChar (statePlayfield ps) (x, y) (chr val)
+        (flip runState) (ps ^. #stack) $ liftM3 (,,) S.pop S.pop S.pop
+    newPlayfield = P.putChar (ps ^. #playfield) (x, y) (chr val)
 
 divisionByZeroPrompt :: Int -> String
 divisionByZeroPrompt = printf "What do you want %ld/0 to be? "
@@ -117,9 +112,9 @@ handleDivisionLike :: FinchIO m => ProgramState -> (Int -> Int -> Int) -> m Prog
 handleDivisionLike ps op = do
     val <- valueToPush
     let newStack = execState (S.push val) stackAfterPop
-    return ps { stateStack = newStack }
+    return $ ps & #stack .~ newStack
   where
-    (values, stackAfterPop) = (flip runState) (stateStack ps) $ liftM2 (,) S.pop S.pop
+    (values, stackAfterPop) = (flip runState) (ps ^. #stack) $ liftM2 (,) S.pop S.pop
     valueToPush = case values of
                       (0, x) -> do
                           FIO.print $ divisionByZeroPrompt x
@@ -128,69 +123,67 @@ handleDivisionLike ps op = do
                       (y, x) -> return $ op x y
 
 moveRandom :: FinchIO m => ProgramState -> m ProgramState
-moveRandom ps = setDirection ps <$> toEnum <$> (flip mod 4) <$> FIO.random
-
-toggleStringMode :: ProgramState -> ProgramState
-toggleStringMode ps = ps { stateStringMode = (not . stateStringMode) ps }
+moveRandom = traverseOf #currentDirection getRandomDirection
+  where
+    getRandomDirection = const $ toEnum <$> (flip mod 4) <$> FIO.random
 
 applyStackOp :: ProgramState -> (Int -> Int -> Int) -> ProgramState
 applyStackOp ps op = modifyStack ps $ liftM2 (flip op) S.pop S.pop >>= S.push
 
+handleNot :: ProgramState -> ProgramState
+handleNot ps = modifyStack ps $ (\x -> if x == 0 then 1 else 0) <$> S.pop >>= S.push
+
 processCurrentCmd :: FinchIO m => ProgramState -> m ProgramState
 processCurrentCmd ps = case cmd of
     Cmd.PopPrintInteger -> popPrintInteger ps
-    Cmd.PopPrintChar -> popPrintChar ps
-    Cmd.PromptInteger -> pushReadInteger ps
-    Cmd.PromptChar -> pushReadChar ps
-    Cmd.MoveRandom -> moveRandom ps
-    Cmd.Div -> handleDivisionLike ps div
+    Cmd.PopPrintChar    -> popPrintChar ps
+    Cmd.PromptInteger   -> pushReadInteger ps
+    Cmd.PromptChar      -> pushReadChar ps
+    Cmd.MoveRandom      -> moveRandom ps
+    Cmd.Div             -> handleDivisionLike ps div
     -- Reference implementation actualy crashes when computing n % 0
     -- We choose to handle it the same as division by 0
-    Cmd.Mod -> handleDivisionLike ps mod
+    Cmd.Mod             -> handleDivisionLike ps mod
     _ -> return $
         case cmd of
-            Cmd.Noop -> ps
-            Cmd.Plus -> applyStackOp ps (+)
-            Cmd.Minus -> applyStackOp ps (-)
-            Cmd.Mult -> applyStackOp ps (*)
-            Cmd.Not -> modifyStack ps $
-                (\x -> if x == 0 then 1 else 0) <$> S.pop >>= S.push
-            Cmd.GreaterThan -> applyStackOp ps (\x y -> if x > y then 1 else 0)
-            Cmd.MoveRight -> setDirection ps DirR
-            Cmd.MoveLeft -> setDirection ps DirL
-            Cmd.MoveUp -> setDirection ps DirU
-            Cmd.MoveDown -> setDirection ps DirD
+            Cmd.Noop         -> ps
+            Cmd.Plus         -> applyStackOp ps (+)
+            Cmd.Minus        -> applyStackOp ps (-)
+            Cmd.Mult         -> applyStackOp ps (*)
+            Cmd.Not          -> handleNot ps
+            Cmd.GreaterThan  -> applyStackOp ps (\x y -> if x > y then 1 else 0)
+            Cmd.MoveRight    -> ps & #currentDirection .~ DirR
+            Cmd.MoveLeft     -> ps & #currentDirection .~ DirL
+            Cmd.MoveUp       -> ps & #currentDirection .~ DirU
+            Cmd.MoveDown     -> ps & #currentDirection .~ DirD
             Cmd.HorizontalIf -> horizontalIf ps
-            Cmd.VerticalIf -> verticalIf ps
-            Cmd.StringMode -> toggleStringMode ps
-            Cmd.Duplicate -> modifyStack ps S.duplicate
-            Cmd.Swap -> modifyStack ps S.swap
-            Cmd.PopDiscard -> modifyStack ps S.pop
-            Cmd.Bridge -> advancePC ps
-            Cmd.Put -> handlePut ps
-            Cmd.Get -> handleGet ps
-            Cmd.Halt -> ps { stateFinished = True }
-            _ -> if isDigit cmd
-                    then modifyStack ps (S.push $ digitToInt cmd)
-                    else ps
+            Cmd.VerticalIf   -> verticalIf ps
+            Cmd.StringMode   -> ps & #stringMode %~ not
+            Cmd.Duplicate    -> modifyStack ps S.duplicate
+            Cmd.Swap         -> modifyStack ps S.swap
+            Cmd.PopDiscard   -> modifyStack ps S.pop
+            Cmd.Bridge       -> advancePC ps
+            Cmd.Put          -> handlePut ps
+            Cmd.Get          -> handleGet ps
+            Cmd.Halt         -> ps & #finished .~ True
+            _                -> if isDigit cmd
+                                   then modifyStack ps (S.push $ digitToInt cmd)
+                                   else ps
   where
     cmd = getCurrentChar ps
 
 handleStringMode :: ProgramState -> ProgramState
-handleStringMode ps = ps
-    { stateStringMode = newStringMode
-    , stateStack      = newStack
-    }
+handleStringMode ps = ps & #stringMode .~ newStringMode & #stack .~ newStack
   where
     ch            = getCurrentChar ps
     newStringMode = ch /= Cmd.StringMode
-    oldStack      = stateStack ps
+    oldStack      = ps ^. #stack
     newStack      = if newStringMode
                        then execState (S.push $ ord ch) oldStack
                        else oldStack
 
 processCurrentChar :: FinchIO m => ProgramState -> m ProgramState
-processCurrentChar ps = if stateStringMode ps
+processCurrentChar ps = if ps ^. #stringMode
                            then return $ handleStringMode ps
                            else processCurrentCmd ps
 
@@ -198,7 +191,7 @@ step :: FinchIO m => ProgramState -> m ProgramState
 step = (fmap advancePC) . processCurrentChar
 
 run :: FinchIO m => ProgramState -> m ProgramState
-run = iterateUntilM stateFinished step
+run = iterateUntilM (^. #finished) step
 
 runString :: FinchIO m => Int -> Int -> String -> m ProgramState
 runString width height input = run programState

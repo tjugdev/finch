@@ -13,12 +13,14 @@ import Data.List.Split (chunksOf)
 import Data.Vector.Unboxed ((!))
 import qualified Data.Vector.Unboxed as V
 import qualified Data.Vector.Unboxed.Mutable as MV
+import Optics (abbreviatedFields, makeFieldLabelsWith, (&), (.~))
 
 data Playfield = Playfield
     { playfieldWidth  :: !Int
     , playfieldHeight :: !Int
     , playfieldRaw    :: !(V.Vector Char)
     } deriving (Eq)
+makeFieldLabelsWith abbreviatedFields ''Playfield
 
 instance Show Playfield where
     show (Playfield w _ raw) = intercalate "\n" $ chunksOf w $ V.toList raw
@@ -38,7 +40,7 @@ getChar playfield@(Playfield w  _ raw) loc@(x, y)
     | otherwise                   = Nothing
 
 putChar :: Playfield -> (Int, Int) -> Char -> Playfield
-putChar playfield@(Playfield w _ raw) (x, y) ch = playfield { playfieldRaw = newRaw }
+putChar playfield@(Playfield w _ raw) (x, y) ch = playfield & #raw .~ newRaw
   where
     newRaw
         | validLocation playfield (x, y) = V.modify (\v -> MV.write v (y * w + x) ch) raw

@@ -27,14 +27,21 @@ dependencies:
 - monad-loops
 - random
 - safe
+- optics
 
 library:
   source-dirs: src
   default-extensions:
   - FlexibleInstances
+  - OverloadedLabels
   - OverloadedStrings
   - TupleSections
   - TypeSynonymInstances
+  - TemplateHaskell
+  - DataKinds
+  - MultiParamTypeClasses
+  - UndecidableInstances
+  - TypeFamilies
   ghc-options:
   - -threaded
   - -rtsopts

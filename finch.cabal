@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 8e7035bcd009e50cdece5c9463338225fb76a8df36d5ab3822a74c8f9f1d43f3
+-- hash: 85420a57463661e1f03af8d702ef7094d5da83570c6ced02838b05cfa8166ef3
 
 name:           finch
 version:        0.1.0.0
@@ -36,12 +36,13 @@ library
       Paths_finch
   hs-source-dirs:
       src
-  default-extensions: FlexibleInstances OverloadedStrings TupleSections TypeSynonymInstances
+  default-extensions: FlexibleInstances OverloadedLabels OverloadedStrings TupleSections TypeSynonymInstances TemplateHaskell DataKinds MultiParamTypeClasses UndecidableInstances TypeFamilies
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Werror -Wall -Wcompat -Widentities -Wincomplete-uni-patterns -Wincomplete-record-updates -Wmissing-export-lists -Wpartial-fields
   build-depends:
       base >=4.7 && <5
     , monad-loops
     , mtl
+    , optics
     , random
     , safe
     , split
@@ -60,6 +61,7 @@ executable finch-exe
     , finch
     , monad-loops
     , mtl
+    , optics
     , random
     , safe
     , split
@@ -81,6 +83,7 @@ test-suite functional-tests
     , hspec
     , monad-loops
     , mtl
+    , optics
     , random
     , safe
     , split
@@ -103,6 +106,7 @@ test-suite unit-tests
     , hspec
     , monad-loops
     , mtl
+    , optics
     , random
     , safe
     , split
