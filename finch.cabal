@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.33.0.
+-- This file has been generated from package.yaml by hpack version 0.35.1.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 85420a57463661e1f03af8d702ef7094d5da83570c6ced02838b05cfa8166ef3
+-- hash: 4d50a0fb237c1df26424087e700aaa8f44b6d24cb5f01531d797f843e392b3ef
 
 name:           finch
 version:        0.1.0.0
@@ -36,7 +36,17 @@ library
       Paths_finch
   hs-source-dirs:
       src
-  default-extensions: FlexibleInstances OverloadedLabels OverloadedStrings TupleSections TypeSynonymInstances TemplateHaskell DataKinds MultiParamTypeClasses UndecidableInstances TypeFamilies
+  default-extensions:
+      FlexibleInstances
+      OverloadedLabels
+      OverloadedStrings
+      TupleSections
+      TypeSynonymInstances
+      TemplateHaskell
+      DataKinds
+      MultiParamTypeClasses
+      UndecidableInstances
+      TypeFamilies
   ghc-options: -threaded -rtsopts -with-rtsopts=-N -Werror -Wall -Wcompat -Widentities -Wincomplete-uni-patterns -Wincomplete-record-updates -Wmissing-export-lists -Wpartial-fields
   build-depends:
       base >=4.7 && <5
