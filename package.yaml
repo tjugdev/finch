@@ -3,7 +3,6 @@ version:             0.1.0.0
 github:              "tjugdev/finch"
 license:             BSD3
 author:              "Tristan Jugdev"
-maintainer:          "tjugdev@gmail.com"
 copyright:           "Tristan Jugdev"
 
 extra-source-files:

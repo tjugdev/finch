@@ -1,10 +1,10 @@
 cabal-version: 1.12
 
--- This file has been generated from package.yaml by hpack version 0.35.1.
+-- This file has been generated from package.yaml by hpack version 0.38.1.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 4d50a0fb237c1df26424087e700aaa8f44b6d24cb5f01531d797f843e392b3ef
+-- hash: 01cd89dfd7a09d124c3ba905223f9533d8d4c199ee3073adfcb7b32387b6f1e4
 
 name:           finch
 version:        0.1.0.0
@@ -12,7 +12,7 @@ description:    Please see the README on GitHub at <https://github.com/tjugdev/f
 homepage:       https://github.com/tjugdev/finch#readme
 bug-reports:    https://github.com/tjugdev/finch/issues
 author:         Tristan Jugdev
-maintainer:     tjugdev@gmail.com
+maintainer:     Tristan Jugdev
 copyright:      Tristan Jugdev
 license:        BSD3
 license-file:   LICENSE
